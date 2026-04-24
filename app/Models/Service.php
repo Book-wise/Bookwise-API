@@ -10,14 +10,21 @@ class Service extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'name', 'duration_minutes', 'price', 'wc_product_id', 'active'
+        'name', 'duration_minutes', 'slot_interval_minutes',
+        'min_duration_minutes', 'max_duration_minutes',
+        'price', 'wc_product_id', 'active'
     ];
 
     protected $casts = [
-        'active'           => 'boolean',
-        'price'            => 'decimal:2',
-        'duration_minutes' => 'integer',
+        'active'                => 'boolean',
+        'price'                 => 'decimal:2',
+        'duration_minutes'      => 'integer',
+        'slot_interval_minutes' => 'integer',
+        'min_duration_minutes'  => 'integer',
+        'max_duration_minutes'  => 'integer',
     ];
+
+    // ── Relaciones ─────────────────────────────────────────────────
 
     public function providers()
     {
@@ -27,5 +34,19 @@ class Service extends Model
     public function bookings()
     {
         return $this->hasMany(Booking::class);
+    }
+
+    // ── Accessors ──────────────────────────────────────────────────
+
+    public function getEffectiveDurationMinutesAttribute(): int
+    {
+        return $this->duration_minutes
+            ?? (int) env('BOOKING_DEFAULT_DURATION_MINUTES', 30);
+    }
+
+    public function getEffectiveSlotIntervalAttribute(): int
+    {
+        return $this->slot_interval_minutes
+            ?? (int) env('BOOKING_SLOT_INTERVAL_MINUTES', 30);
     }
 }
