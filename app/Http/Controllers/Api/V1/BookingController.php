@@ -3,9 +3,139 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Booking;
+use App\Models\BookingStatus;
+use App\Models\Service;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 
 class BookingController extends Controller
 {
-    //
+    // ── GET /v1/bookings ───────────────────────────────────────────
+    public function index(Request $request): JsonResponse
+    {
+        $bookings = Booking::with(['client', 'service', 'provider', 'location', 'status'])
+            ->when($request->client_id,   fn($q) => $q->where('client_id',   $request->client_id))
+            ->when($request->service_id,  fn($q) => $q->where('service_id',  $request->service_id))
+            ->when($request->provider_id, fn($q) => $q->where('provider_id', $request->provider_id))
+            ->when($request->location_id, fn($q) => $q->where('location_id', $request->location_id))
+            ->when($request->status_id,   fn($q) => $q->where('status_id',   $request->status_id))
+            ->when($request->date_from,   fn($q) => $q->whereDate('start_time', '>=', $request->date_from))
+            ->when($request->date_to,     fn($q) => $q->whereDate('start_time', '<=', $request->date_to))
+            ->when($request->wc_order_id, fn($q) => $q->where('wc_order_id', $request->wc_order_id))
+            ->orderBy('start_time', 'desc')
+            ->paginate($request->per_page ?? 15);
+
+        return response()->json($bookings);
+    }
+
+    // ── GET /v1/bookings/{id} ──────────────────────────────────────
+    public function show(int $id): JsonResponse
+    {
+        $booking = Booking::with(['client', 'service', 'provider', 'location', 'status', 'statusHistory.status', 'sale'])
+            ->findOrFail($id);
+
+        return response()->json(['data' => $booking]);
+    }
+
+    // ── POST /v1/bookings ──────────────────────────────────────────
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'start_time'       => ['required', 'date'],
+            'end_time'         => ['nullable', 'date', 'after:start_time'],
+            'service_id'       => ['required', 'integer', 'exists:services,id'],
+            'provider_id'      => ['required', 'integer', 'exists:providers,id'],
+            'client_id'        => ['required', 'integer', 'exists:clients,id'],
+            'location_id'      => ['required', 'integer', 'exists:locations,id'],
+            'status_id'        => ['required', 'integer', 'exists:booking_statuses,id'],
+            'price'            => ['nullable', 'numeric', 'min:0'],
+            'notes'            => ['nullable', 'string', 'max:1000'],
+            'duration_minutes' => ['nullable', 'integer', 'min:15', 'max:480'],
+            'wc_order_id'      => ['nullable', 'integer'],
+        ]);
+
+        $service   = Service::findOrFail($validated['service_id']);
+        $startTime = Carbon::parse($validated['start_time']);
+
+        // Duración efectiva — CHG-001
+        $effectiveDuration = $validated['duration_minutes']
+            ?? $service->duration_minutes
+            ?? (int) env('BOOKING_DEFAULT_DURATION_MINUTES', 30);
+
+        $endTime = isset($validated['end_time'])
+            ? Carbon::parse($validated['end_time'])
+            : $startTime->copy()->addMinutes($effectiveDuration);
+
+        $booking = Booking::create([
+            ...$validated,
+            'end_time'                => $endTime,
+            'custom_duration_minutes' => $validated['duration_minutes'] ?? null,
+            'price'                   => $validated['price'] ?? $service->price,
+        ]);
+
+        $booking->load(['client', 'service', 'provider', 'location', 'status']);
+
+        return response()->json(['data' => $booking], 201);
+    }
+
+    // ── PATCH /v1/bookings/{id} ────────────────────────────────────
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $booking = Booking::findOrFail($id);
+
+        $validated = $request->validate([
+            'start_time'  => ['sometimes', 'date'],
+            'end_time'    => ['sometimes', 'date', 'after:start_time'],
+            'status_id'   => ['sometimes', 'integer', 'exists:booking_statuses,id'],
+            'price'       => ['sometimes', 'numeric', 'min:0'],
+            'notes'       => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'provider_id' => ['sometimes', 'integer', 'exists:providers,id'],
+        ]);
+
+        // Proteger contra cancelación directa via update
+        if (isset($validated['status_id'])) {
+            $status = BookingStatus::findOrFail($validated['status_id']);
+            if ($status->is_cancellation) {
+                return response()->json([
+                    'error'  => 'forbidden',
+                    'detail' => 'Use PATCH /bookings/{id}/cancel to cancel a booking.',
+                ], 403);
+            }
+        }
+
+        $booking->update($validated);
+        $booking->load(['client', 'service', 'provider', 'location', 'status']);
+
+        return response()->json(['data' => $booking]);
+    }
+
+    // ── PATCH /v1/bookings/{id}/cancel ────────────────────────────
+    public function cancel(Request $request, int $id): JsonResponse
+    {
+        $booking = Booking::findOrFail($id);
+
+        $cancelStatus = BookingStatus::where('is_cancellation', true)->firstOrFail();
+
+        // Ya está cancelada
+        if ($booking->status_id === $cancelStatus->id) {
+            return response()->json([
+                'error'  => 'already_cancelled',
+                'detail' => 'This booking is already cancelled.',
+            ], 422);
+        }
+
+        $booking->update(['status_id' => $cancelStatus->id]);
+
+        // Registrar en historial
+        $booking->statusHistory()->create([
+            'status_id' => $cancelStatus->id,
+            'notes'     => $request->input('notes', 'Cancelled via API'),
+        ]);
+
+        $booking->load(['client', 'service', 'provider', 'location', 'status']);
+
+        return response()->json(['data' => $booking]);
+    }
 }
