@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\V1\SaleResource;
 use App\Models\Sale;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -20,7 +21,7 @@ class SaleController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate($request->per_page ?? 15);
 
-        return response()->json($sales);
+        return response()->json(SaleResource::collection($sales));
     }
 
     public function show(int $id): JsonResponse
@@ -28,6 +29,6 @@ class SaleController extends Controller
         $sale = Sale::with(['booking.client', 'booking.service', 'booking.provider', 'booking.location'])
             ->findOrFail($id);
 
-        return response()->json(['data' => $sale]);
+        return response()->json(['data' => new SaleResource($sale)]);
     }
 }

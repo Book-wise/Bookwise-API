@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\V1\AvailableSlotResource;
 use App\Services\SlotAvailabilityService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -41,7 +42,7 @@ class AvailableSlotsController extends Controller
         );
 
         return response()->json([
-            'data' => $slots,
+            'data' => AvailableSlotResource::collection($slots),
             'meta' => [
                 'date'             => $validated['start_date'],
                 'location_id'      => $validated['location_id'],

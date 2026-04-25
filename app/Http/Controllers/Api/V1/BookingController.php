@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\V1\BookingResource;
 use App\Models\Booking;
 use App\Models\BookingStatus;
 use App\Models\Service;
@@ -27,7 +28,7 @@ class BookingController extends Controller
             ->orderBy('start_time', 'desc')
             ->paginate($request->per_page ?? 15);
 
-        return response()->json($bookings);
+        return response()->json(BookingResource::collection($bookings));
     }
 
     // ── GET /v1/bookings/{id} ──────────────────────────────────────
@@ -36,7 +37,7 @@ class BookingController extends Controller
         $booking = Booking::with(['client', 'service', 'provider', 'location', 'status', 'statusHistory.status', 'sale'])
             ->findOrFail($id);
 
-        return response()->json(['data' => $booking]);
+        return response()->json(['data' => new BookingResource($booking)]);
     }
 
     // ── POST /v1/bookings ──────────────────────────────────────────
@@ -77,7 +78,7 @@ class BookingController extends Controller
 
         $booking->load(['client', 'service', 'provider', 'location', 'status']);
 
-        return response()->json(['data' => $booking], 201);
+        return response()->json(['data' => new BookingResource($booking)], 201);
     }
 
     // ── PATCH /v1/bookings/{id} ────────────────────────────────────
@@ -108,7 +109,7 @@ class BookingController extends Controller
         $booking->update($validated);
         $booking->load(['client', 'service', 'provider', 'location', 'status']);
 
-        return response()->json(['data' => $booking]);
+        return response()->json(['data' => new BookingResource($booking)]);
     }
 
     // ── PATCH /v1/bookings/{id}/cancel ────────────────────────────
@@ -136,6 +137,6 @@ class BookingController extends Controller
 
         $booking->load(['client', 'service', 'provider', 'location', 'status']);
 
-        return response()->json(['data' => $booking]);
+        return response()->json(['data' => new BookingResource($booking)]);
     }
 }

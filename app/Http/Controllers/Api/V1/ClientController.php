@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\V1\ClientResource;
 use App\Models\Client;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -24,7 +25,7 @@ class ClientController extends Controller
             ->orderBy('first_name')
             ->paginate($request->per_page ?? 15);
 
-        return response()->json($clients);
+        return response()->json(ClientResource::collection($clients));
     }
 
     // ── GET /v1/clients/{id} ───────────────────────────────────────
@@ -33,7 +34,7 @@ class ClientController extends Controller
         $client = Client::with(['bookings.status', 'customAttributes.template'])
             ->findOrFail($id);
 
-        return response()->json(['data' => $client]);
+        return response()->json(['data' => new ClientResource($client)]);
     }
 
     // ── POST /v1/clients ───────────────────────────────────────────
@@ -50,7 +51,7 @@ class ClientController extends Controller
 
         $client = Client::create($validated);
 
-        return response()->json(['data' => $client], 201);
+        return response()->json(['data' => new ClientResource($client)], 201);
     }
 
     // ── PATCH /v1/clients/{id} ─────────────────────────────────────
@@ -69,7 +70,7 @@ class ClientController extends Controller
 
         $client->update($validated);
 
-        return response()->json(['data' => $client->fresh()]);
+        return response()->json(['data' => new ClientResource($client->fresh())]);
     }
 
     // ── PATCH /v1/clients/{id}/deactivate ─────────────────────────
@@ -86,6 +87,6 @@ class ClientController extends Controller
 
         $client->update(['active' => false]);
 
-        return response()->json(['data' => $client->fresh()]);
+        return response()->json(['data' => new ClientResource($client->fresh())]);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\V1\LocationResource;
 use App\Models\Location;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -17,12 +18,12 @@ class LocationController extends Controller
             ->orderBy('name')
             ->paginate($request->per_page ?? 15);
 
-        return response()->json($locations);
+        return response()->json(LocationResource::collection($locations));
     }
 
     public function show(int $id): JsonResponse
     {
         $location = Location::with('providers')->findOrFail($id);
-        return response()->json(['data' => $location]);
+        return response()->json(['data' => new LocationResource($location)]);
     }
 }
