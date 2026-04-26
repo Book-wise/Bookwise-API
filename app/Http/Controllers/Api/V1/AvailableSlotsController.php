@@ -31,6 +31,7 @@ class AvailableSlotsController extends Controller
                     }
                 },
             ],
+            'slot_interval' => ['nullable', 'integer', 'min:5', 'max:480'],
         ]);
 
         $slots = $this->slotService->getAvailableSlots(
@@ -39,6 +40,7 @@ class AvailableSlotsController extends Controller
             serviceId:       $validated['service_id']       ?? null,
             providerId:      $validated['provider_id']      ?? null,
             durationMinutes: $validated['duration_minutes'] ?? null,
+            slotInterval:    $validated['slot_interval']    ?? null,
         );
 
         return response()->json([
@@ -48,6 +50,7 @@ class AvailableSlotsController extends Controller
                 'location_id'      => $validated['location_id'],
                 'service_id'       => $validated['service_id'] ?? null,
                 'duration_minutes' => $validated['duration_minutes'] ?? null,
+                'slot_interval'    => $validated['slot_interval'] ?? null,
                 'total_slots'      => $slots->count(),
             ],
         ]);

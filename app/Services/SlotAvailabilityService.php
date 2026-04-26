@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Booking;
-use App\Models\Location;
 use App\Models\Service;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -15,7 +14,8 @@ class SlotAvailabilityService
         string $startDate,
         ?int   $serviceId       = null,
         ?int   $providerId      = null,
-        ?int   $durationMinutes = null
+        ?int   $durationMinutes = null,
+        ?int   $slotInterval    = null
     ): Collection {
 
         // ── 1. Resolver duración efectiva ──────────────────────────
@@ -25,15 +25,17 @@ class SlotAvailabilityService
             ?? $service?->duration_minutes
             ?? (int) env('BOOKING_DEFAULT_DURATION_MINUTES', 30);
 
-        $interval = $service?->slot_interval_minutes
-            ?? (int) env('BOOKING_SLOT_INTERVAL_MINUTES', 30);
+        // Prioridad: parámetro > servicio > .env > fallback 15
+        $interval = $slotInterval
+            ?? $service?->slot_interval_minutes
+            ?? (int) env('BOOKING_SLOT_INTERVAL_MINUTES', 15);
 
         // ── 2. Rango del día ───────────────────────────────────────
-        $date      = Carbon::parse($startDate);
-        $dayStart  = $date->copy()->setTime(9, 0);
-        $dayEnd    = $date->copy()->setTime(19, 0);
+        $date     = Carbon::parse($startDate);
+        $dayStart = $date->copy()->setTime(9, 0);
+        $dayEnd   = $date->copy()->setTime(19, 0);
 
-        // ── 3. Reservas activas del día ───────────────────────────
+        // ── 3. Reservas activas del día ────────────────────────────
         $existingBookings = Booking::with('status')
             ->active()
             ->where('location_id', $locationId)
