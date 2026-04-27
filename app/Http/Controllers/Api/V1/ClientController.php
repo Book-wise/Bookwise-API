@@ -10,6 +10,21 @@ use Illuminate\Http\JsonResponse;
 
 class ClientController extends Controller
 {
+     // ── GET /v1/me — Cliente autenticado por email ────────────────
+    public function me(Request $request): JsonResponse
+    {
+        $user   = $request->user();
+        $client = Client::where('email', $user->email)->first();
+
+        if (!$client) {
+            return response()->json([
+                'error'  => 'client_not_found',
+                'detail' => 'No Kinesilk client found for this account.',
+            ], 404);
+        }
+
+        return response()->json(['data' => new ClientResource($client)]);
+    }
     // ── GET /v1/clients ────────────────────────────────────────────
     public function index(Request $request): JsonResponse
     {

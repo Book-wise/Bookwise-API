@@ -84,4 +84,7 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
         ->middleware('scope:clients:write');
     Route::patch('/client-packs/{id}/use', [ClientPackController::class, 'use'])
         ->middleware('scope:bookings:write');
+
+        // Me — cliente autenticado
+    Route::get('/me', [ClientController::class, 'me'])->middleware('scope:clients:read');
 });

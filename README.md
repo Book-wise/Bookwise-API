@@ -56,3 +56,73 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+---
+
+## Kinesilk API — Endpoints
+
+### Públicos (sin autenticación)
+
+| Método | Ruta | Descripción |
+| ------ | ---- | ----------- |
+| `GET` | `/api/v1/available_slots` | Slots disponibles para reserva |
+| `GET` | `/api/v1/services` | Listado de servicios |
+| `GET` | `/api/v1/services/{id}` | Detalle de un servicio |
+| `GET` | `/api/v1/locations` | Listado de locales |
+| `GET` | `/api/v1/locations/{id}` | Detalle de un local |
+| `GET` | `/api/v1/packs` | Listado de packs de servicios |
+| `GET` | `/api/v1/packs/{id}` | Detalle de un pack |
+| `POST` | `/api/v1/webhooks/woocommerce` | Webhook de WooCommerce (HMAC-SHA256) |
+
+### Autenticados — Bearer token + scope requerido
+
+#### Bookings
+
+| Método | Ruta | Scope | Descripción |
+| ------ | ---- | ----- | ----------- |
+| `GET` | `/api/v1/bookings` | `bookings:read` | Listado de reservas |
+| `GET` | `/api/v1/bookings/{id}` | `bookings:read` | Detalle de una reserva |
+| `POST` | `/api/v1/bookings` | `bookings:write` | Crear reserva |
+| `PATCH` | `/api/v1/bookings/{id}` | `bookings:write` | Actualizar reserva |
+| `PATCH` | `/api/v1/bookings/{id}/cancel` | `bookings:write` | Cancelar reserva |
+
+#### Clients
+
+| Método | Ruta | Scope | Descripción |
+| ------ | ---- | ----- | ----------- |
+| `GET` | `/api/v1/clients` | `clients:read` | Listado de clientes |
+| `GET` | `/api/v1/clients/{id}` | `clients:read` | Detalle de un cliente |
+| `POST` | `/api/v1/clients` | `clients:write` | Crear cliente |
+| `PATCH` | `/api/v1/clients/{id}` | `clients:write` | Actualizar cliente |
+| `PATCH` | `/api/v1/clients/{id}/deactivate` | `clients:write` | Desactivar cliente |
+| `GET` | `/api/v1/clients/{id}/attributes` | `clients:read` | Atributos personalizados del cliente |
+| `GET` | `/api/v1/clients/{id}/packs` | `clients:read` | Packs del cliente |
+
+#### Providers
+
+| Método | Ruta | Scope | Descripción |
+| ------ | ---- | ----- | ----------- |
+| `GET` | `/api/v1/providers` | `providers:read` | Listado de proveedores |
+| `GET` | `/api/v1/providers/{id}` | `providers:read` | Detalle de un proveedor |
+
+#### Sales
+
+| Método | Ruta | Scope | Descripción |
+| ------ | ---- | ----- | ----------- |
+| `GET` | `/api/v1/sales` | `sales:read` | Listado de ventas |
+| `GET` | `/api/v1/sales/{id}` | `sales:read` | Detalle de una venta |
+
+#### Client Packs
+
+| Método | Ruta | Scope | Descripción |
+| ------ | ---- | ----- | ----------- |
+| `GET` | `/api/v1/client-packs` | `clients:read` | Listado de packs de clientes |
+| `GET` | `/api/v1/client-packs/{id}` | `clients:read` | Detalle de un pack de cliente |
+| `POST` | `/api/v1/client-packs` | `clients:write` | Asignar pack a cliente |
+| `PATCH` | `/api/v1/client-packs/{id}/use` | `bookings:write` | Consumir sesión de un pack |
+
+#### Custom Attributes
+
+| Método | Ruta | Scope | Descripción |
+| ------ | ---- | ----- | ----------- |
+| `GET` | `/api/v1/custom_attributes` | `clients:read` | Listado de atributos personalizados |
