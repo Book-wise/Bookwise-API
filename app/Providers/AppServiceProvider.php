@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Services\WooCommerceService;
+use App\Services\WooCommerceCustomerService;
 use App\Services\SlotAvailabilityService;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
@@ -15,6 +16,10 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(WooCommerceService::class, function () {
             return new WooCommerceService();
+        });
+
+        $this->app->singleton(WooCommerceCustomerService::class, function () {
+            return new WooCommerceCustomerService();
         });
 
         $this->app->singleton(SlotAvailabilityService::class, function () {

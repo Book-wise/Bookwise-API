@@ -31,7 +31,7 @@ Route::middleware('throttle:api_public')->prefix('v1')->group(function () {
 // Endpoints autenticados — Bearer token + scopes
 Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(function () {
 
-    // Bookings
+    // Bookings - providers see only their location's bookings, admins see all
     Route::get('/bookings',               [BookingController::class, 'index'])
         ->middleware('scope:bookings:read');
     Route::get('/bookings/{id}',          [BookingController::class, 'show'])
@@ -39,7 +39,8 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
     Route::post('/bookings',              [BookingController::class, 'store'])
         ->middleware('scope:bookings:write');
     Route::patch('/bookings/{id}',        [BookingController::class, 'update'])
-        ->middleware('scope:bookings:write');
+        ->middleware('scope:bookings:write')
+        ->middleware('check.role:provider,admin'); // Only provider/admin can update
     Route::patch('/bookings/{id}/cancel', [BookingController::class, 'cancel'])
         ->middleware('scope:bookings:write');
 

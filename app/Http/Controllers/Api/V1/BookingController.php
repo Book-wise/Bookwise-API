@@ -7,6 +7,7 @@ use App\Http\Resources\V1\BookingResource;
 use App\Models\Booking;
 use App\Models\BookingStatus;
 use App\Models\Service;
+use App\Models\Location;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -16,7 +17,17 @@ class BookingController extends Controller
     // ── GET /v1/bookings ───────────────────────────────────────────
     public function index(Request $request): JsonResponse
     {
+        $user = $request->user();
+
         $bookings = Booking::with(['client', 'service', 'provider', 'location', 'status'])
+            // Provider filter: only show bookings for their locations
+            ->when($user?->role?->value === 'provider', function ($query) use ($user) {
+                $provider = $user->provider;
+                if ($provider) {
+                    $locationIds = $provider->locations->pluck('id')->toArray();
+                    $query->whereIn('location_id', $locationIds);
+                }
+            })
             ->when($request->client_id,   fn($q) => $q->where('client_id',   $request->client_id))
             ->when($request->service_id,  fn($q) => $q->where('service_id',  $request->service_id))
             ->when($request->provider_id, fn($q) => $q->where('provider_id', $request->provider_id))

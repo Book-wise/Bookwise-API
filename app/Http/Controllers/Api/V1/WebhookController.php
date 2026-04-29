@@ -7,11 +7,16 @@ use App\Models\Booking;
 use App\Models\BookingStatus;
 use App\Models\Sale;
 use App\Models\WoocommerceWebhooksLog;
+use App\Services\WooCommerceCustomerService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class WebhookController extends Controller
 {
+    public function __construct(
+        private WooCommerceCustomerService $customerService
+    ) {}
+
     public function handle(Request $request): JsonResponse
     {
         $secret    = env('WC_WEBHOOK_SECRET');
@@ -25,6 +30,13 @@ class WebhookController extends Controller
 
         $data    = json_decode($payload, true);
         $event   = $request->header('X-WC-Webhook-Topic', 'unknown');
+
+        // Check for customer events first
+        if (str_contains($event, 'customer.created') || str_contains($event, 'customer.updated')) {
+            return $this->handleCustomerEvent($data, $event);
+        }
+
+        // Order events (existing logic)
         $orderId = $data['id'] ?? null;
 
         $log = WoocommerceWebhooksLog::create([
@@ -42,6 +54,29 @@ class WebhookController extends Controller
             } else {
                 $log->update(['status' => 'processed']);
             }
+        } catch (\Throwable $e) {
+            $log->update(['status' => 'failed', 'error_message' => $e->getMessage()]);
+            return response()->json(['error' => 'processing_failed'], 500);
+        }
+
+        return response()->json(['received' => true], 200);
+    }
+
+    private function handleCustomerEvent(array $data, string $event): JsonResponse
+    {
+        $customerId = $data['id'] ?? null;
+
+        // Log the customer event
+        $log = WoocommerceWebhooksLog::create([
+            'event'       => $event,
+            'wc_order_id' => $customerId, // Reusing wc_order_id column for customer ID
+            'payload'     => json_encode($data),
+            'status'      => 'received',
+        ]);
+
+        try {
+            $this->customerService->syncCustomer($data, $event);
+            $log->update(['status' => 'processed']);
         } catch (\Throwable $e) {
             $log->update(['status' => 'failed', 'error_message' => $e->getMessage()]);
             return response()->json(['error' => 'processing_failed'], 500);
