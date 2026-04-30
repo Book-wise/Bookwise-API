@@ -58,7 +58,7 @@ class BookingController extends Controller
             'start_time'       => ['required', 'date'],
             'end_time'         => ['nullable', 'date', 'after:start_time'],
             'service_id'       => ['required', 'integer', 'exists:services,id'],
-            'provider_id'      => ['required', 'integer', 'exists:providers,id'],
+            'provider_id'      => ['nullable', 'integer', 'exists:providers,id'],
             'client_id'        => ['required', 'integer', 'exists:clients,id'],
             'location_id'      => ['required', 'integer', 'exists:locations,id'],
             'status_id'        => ['required', 'integer', 'exists:booking_statuses,id'],
@@ -79,6 +79,30 @@ class BookingController extends Controller
         $endTime = isset($validated['end_time'])
             ? Carbon::parse($validated['end_time'])
             : $startTime->copy()->addMinutes($effectiveDuration);
+
+        // Check for booking overlaps (location or client)
+        $conflict = $this->checkBookingOverlap(
+            $validated['location_id'],
+            $validated['client_id'],
+            $startTime,
+            $endTime
+        );
+
+        if ($conflict) {
+            $conflictType = $conflict->location_id === (int) $validated['location_id']
+                ? 'Location overlap with existing booking'
+                : 'Client overlap with existing booking';
+
+            return response()->json([
+                'error'       => 'conflict',
+                'detail'     => $conflictType,
+                'conflicts_with' => [
+                    'id'        => $conflict->id,
+                    'start_time' => $conflict->start_time->toIso8601String(),
+                    'end_time'   => $conflict->end_time->toIso8601String(),
+                ],
+            ], 409);
+        }
 
         $booking = Booking::create([
             ...$validated,
@@ -103,7 +127,7 @@ class BookingController extends Controller
             'status_id'   => ['sometimes', 'integer', 'exists:booking_statuses,id'],
             'price'       => ['sometimes', 'numeric', 'min:0'],
             'notes'       => ['sometimes', 'nullable', 'string', 'max:1000'],
-            'provider_id' => ['sometimes', 'integer', 'exists:providers,id'],
+            'provider_id' => ['sometimes', 'nullable', 'integer', 'exists:providers,id'],
         ]);
 
         // Proteger contra cancelación directa via update
@@ -114,6 +138,51 @@ class BookingController extends Controller
                     'error'  => 'forbidden',
                     'detail' => 'Use PATCH /bookings/{id}/cancel to cancel a booking.',
                 ], 403);
+            }
+        }
+
+        // Check for booking overlaps if time, location, or client is being changed
+        if (isset($validated['start_time']) || isset($validated['end_time'])
+            || isset($validated['location_id']) || isset($validated['client_id'])) {
+
+            $startTime = isset($validated['start_time'])
+                ? Carbon::parse($validated['start_time'])
+                : $booking->start_time;
+
+            $endTime = isset($validated['end_time'])
+                ? Carbon::parse($validated['end_time'])
+                : ($booking->end_time ?? $startTime->copy()->addMinutes($booking->effective_duration_minutes));
+
+            $locationId = isset($validated['location_id'])
+                ? $validated['location_id']
+                : $booking->location_id;
+
+            $clientId = isset($validated['client_id'])
+                ? $validated['client_id']
+                : $booking->client_id;
+
+            $conflict = $this->checkBookingOverlap(
+                $locationId,
+                $clientId,
+                $startTime,
+                $endTime,
+                $booking->id
+            );
+
+            if ($conflict) {
+                $conflictType = $conflict->location_id === $locationId
+                    ? 'Location overlap with existing booking'
+                    : 'Client overlap with existing booking';
+
+                return response()->json([
+                    'error'       => 'conflict',
+                    'detail'     => $conflictType,
+                    'conflicts_with' => [
+                        'id'        => $conflict->id,
+                        'start_time' => $conflict->start_time->toIso8601String(),
+                        'end_time'   => $conflict->end_time->toIso8601String(),
+                    ],
+                ], 409);
             }
         }
 
@@ -149,5 +218,42 @@ class BookingController extends Controller
         $booking->load(['client', 'service', 'provider', 'location', 'status']);
 
         return response()->json(['data' => new BookingResource($booking)]);
+    }
+
+    // ── Private: Check for booking overlaps ───────────────────────────
+    /**
+     * Check if there are any overlapping bookings (location or client).
+     *
+     * @param int $locationId
+     * @param int $clientId
+     * @param Carbon $startTime
+     * @param Carbon $endTime
+     * @param int|null $excludeBookingId Booking ID to exclude from the search
+     * @return Booking|null The conflicting booking, or null if no conflict
+     */
+    private function checkBookingOverlap(
+        int $locationId,
+        int $clientId,
+        Carbon $startTime,
+        Carbon $endTime,
+        ?int $excludeBookingId = null
+    ): ?Booking {
+        // Check location overlap
+        $locationConflict = Booking::where('location_id', $locationId)
+            ->active()
+            ->overlapping($startTime, $endTime, $excludeBookingId)
+            ->first();
+
+        if ($locationConflict) {
+            return $locationConflict;
+        }
+
+        // Check client overlap
+        $clientConflict = Booking::where('client_id', $clientId)
+            ->active()
+            ->overlapping($startTime, $endTime, $excludeBookingId)
+            ->first();
+
+        return $clientConflict;
     }
 }
