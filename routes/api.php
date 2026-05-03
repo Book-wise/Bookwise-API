@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\AvailableSlotsController;
 use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\ClientController;
@@ -16,6 +17,12 @@ use App\Http\Controllers\Api\V1\ClientPackController;
 // Webhook WooCommerce — HMAC, sin Sanctum
 Route::post('/v1/webhooks/woocommerce', [WebhookController::class, 'handle'])
     ->middleware('throttle:woocommerce');
+
+// Auth
+Route::middleware('throttle:api_public')->prefix('v1')->group(function () {
+    Route::post('/auth/login',  [AuthController::class, 'login']);
+    Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+});
 
 // Endpoints publicos — sin token
 Route::middleware('throttle:api_public')->prefix('v1')->group(function () {
@@ -40,7 +47,7 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
         ->middleware('scope:bookings:write');
     Route::patch('/bookings/{id}',        [BookingController::class, 'update'])
         ->middleware('scope:bookings:write')
-        ->middleware('check.role:provider,admin'); // Only provider/admin can update
+        ->middleware('check.role:provider,admin');
     Route::patch('/bookings/{id}/cancel', [BookingController::class, 'cancel'])
         ->middleware('scope:bookings:write');
 
@@ -86,6 +93,6 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
     Route::patch('/client-packs/{id}/use', [ClientPackController::class, 'use'])
         ->middleware('scope:bookings:write');
 
-        // Me — cliente autenticado
+    // Me
     Route::get('/me', [ClientController::class, 'me'])->middleware('scope:clients:read');
 });
