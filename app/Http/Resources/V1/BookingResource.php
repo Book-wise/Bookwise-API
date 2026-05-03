@@ -23,12 +23,15 @@ class BookingResource extends JsonResource
             'service'                    => new ServiceResource($this->whenLoaded('service')),
             'provider'                   => new ProviderResource($this->whenLoaded('provider')),
             'location'                   => new LocationResource($this->whenLoaded('location')),
+            'status_id'                  => $this->status_id,
             'status'                     => [
                 'id'              => $this->status?->id,
                 'name'            => $this->status?->name,
                 'color'           => $this->status?->color,
                 'is_cancellation' => $this->status?->is_cancellation,
             ],
+            'payment_status'             => $this->whenLoaded('sale', fn() => $this->sale->payment_status, null),
+            'payment'                    => new PaymentResource($this->whenLoaded('sale')),
         ];
     }
 }
