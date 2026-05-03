@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\AvailableSlotsController;
 use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\ClientController;
@@ -14,6 +15,12 @@ use App\Http\Controllers\Api\V1\WebhookController;
 // Webhook WooCommerce — autenticación HMAC, sin Sanctum
 Route::post('/v1/webhooks/woocommerce', [WebhookController::class, 'handle'])
     ->middleware('throttle:woocommerce');
+
+// Auth
+Route::middleware('throttle:api_public')->prefix('v1')->group(function () {
+    Route::post('/auth/login',  [AuthController::class, 'login']);
+    Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+});
 
 // Endpoints públicos — sin token, 60 req/min
 Route::middleware('throttle:api_public')->prefix('v1')->group(function () {

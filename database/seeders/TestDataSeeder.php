@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class TestDataSeeder extends Seeder
 {
@@ -34,7 +35,7 @@ class TestDataSeeder extends Seeder
         ]);
 
         // Provider
-        DB::table('providers')->insert([
+        $providerId = DB::table('providers')->insertGetId([
             'first_name' => 'María',
             'last_name'  => 'González',
             'email'      => 'maria@kinesilk.cl',
@@ -43,10 +44,37 @@ class TestDataSeeder extends Seeder
             'updated_at' => now(),
         ]);
 
-        // Booking status
+        // Users
+        DB::table('users')->insert([
+            [
+                'name'        => 'Admin Kinesilk',
+                'email'       => 'admin@kinesilk.cl',
+                'password'    => Hash::make('password'),
+                'role'        => 'admin',
+                'provider_id' => null,
+                'created_at'  => now(),
+                'updated_at'  => now(),
+            ],
+            [
+                'name'        => 'María González',
+                'email'       => 'maria@kinesilk.cl',
+                'password'    => Hash::make('password'),
+                'role'        => 'provider',
+                'provider_id' => $providerId,
+                'created_at'  => now(),
+                'updated_at'  => now(),
+            ],
+        ]);
+
+        // Booking statuses — IDs match frontend STATUS_COLOR_MAP (1-6) + Cancelada (7)
         DB::table('booking_statuses')->insert([
-            ['name' => 'Confirmada', 'color' => '#1D9E75', 'is_cancellation' => false, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'Cancelada',  'color' => '#D85A30', 'is_cancellation' => true,  'created_at' => now(), 'updated_at' => now()],
+            ['id' => 1, 'name' => 'Reservado',   'color' => '#93c5fd', 'is_cancellation' => false, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 2, 'name' => 'Confirmado',  'color' => '#fb923c', 'is_cancellation' => false, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 3, 'name' => 'Asiste',      'color' => '#ec4899', 'is_cancellation' => false, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 4, 'name' => 'No asistio',  'color' => '#f9a8d4', 'is_cancellation' => false, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 5, 'name' => 'Pendiente',   'color' => '#fca5a5', 'is_cancellation' => false, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 6, 'name' => 'En espera',   'color' => '#86efac', 'is_cancellation' => false, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 7, 'name' => 'Cancelada',   'color' => '#d1d5db', 'is_cancellation' => true,  'created_at' => now(), 'updated_at' => now()],
         ]);
     }
 }
