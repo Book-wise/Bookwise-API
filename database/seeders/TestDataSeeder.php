@@ -236,5 +236,4 @@ class TestDataSeeder extends Seeder
             ['client_pack_id' => $cp3, 'booking_id' => null,            'session_number' => 4, 'status' => 'pending',   'attended_at' => null,                  'created_at' => now(), 'updated_at' => now()],
         ]);
     }
-    }
 }
