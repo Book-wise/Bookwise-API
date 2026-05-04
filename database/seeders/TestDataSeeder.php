@@ -11,21 +11,21 @@ class TestDataSeeder extends Seeder
     public function run(): void
     {
         // ── Locations ─────────────────────────────────────────────────
-        $locCentro      = DB::table('locations')->insertGetId(['name' => 'Kinesilk Centro',      'address' => 'Av. Providencia 1234',     'city' => 'Santiago', 'timezone' => 'America/Santiago', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $locLasCondes   = DB::table('locations')->insertGetId(['name' => 'Kinesilk Las Condes',  'address' => 'Av. Apoquindo 4500',       'city' => 'Santiago', 'timezone' => 'America/Santiago', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $locProvidencia = DB::table('locations')->insertGetId(['name' => 'Kinesilk Providencia', 'address' => 'Av. Pedro de Valdivia 210','city' => 'Santiago', 'timezone' => 'America/Santiago', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $locCentro      = DB::table('locations')->insertGetId(['name' => 'Kinesilk Centro',      'address' => 'Av. Providencia 1234',      'city' => 'Santiago', 'timezone' => 'America/Santiago', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $locLasCondes   = DB::table('locations')->insertGetId(['name' => 'Kinesilk Las Condes',  'address' => 'Av. Apoquindo 4500',        'city' => 'Santiago', 'timezone' => 'America/Santiago', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $locProvidencia = DB::table('locations')->insertGetId(['name' => 'Kinesilk Providencia', 'address' => 'Av. Pedro de Valdivia 210', 'city' => 'Santiago', 'timezone' => 'America/Santiago', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
 
         // ── Services ──────────────────────────────────────────────────
-        $svcRelajante  = DB::table('services')->insertGetId(['name' => 'Masaje Relajante',  'duration_minutes' => 60, 'slot_interval_minutes' => 15, 'min_duration_minutes' => 30, 'max_duration_minutes' => 120, 'price' => 35000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $svcDeportivo  = DB::table('services')->insertGetId(['name' => 'Masaje Deportivo',  'duration_minutes' => 45, 'slot_interval_minutes' => 15, 'min_duration_minutes' => 30, 'max_duration_minutes' => 90,  'price' => 28000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $svcKinesio    = DB::table('services')->insertGetId(['name' => 'Kinesiología',      'duration_minutes' => 60, 'slot_interval_minutes' => 15, 'min_duration_minutes' => 45, 'max_duration_minutes' => 120, 'price' => 40000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $svcDrenaje    = DB::table('services')->insertGetId(['name' => 'Drenaje Linfático', 'duration_minutes' => 90, 'slot_interval_minutes' => 15, 'min_duration_minutes' => 60, 'max_duration_minutes' => 120, 'price' => 45000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $svcRelajante = DB::table('services')->insertGetId(['name' => 'Masaje Relajante',  'duration_minutes' => 60, 'slot_interval_minutes' => 15, 'min_duration_minutes' => 30, 'max_duration_minutes' => 120, 'price' => 35000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $svcDeportivo = DB::table('services')->insertGetId(['name' => 'Masaje Deportivo',  'duration_minutes' => 45, 'slot_interval_minutes' => 15, 'min_duration_minutes' => 30, 'max_duration_minutes' => 90,  'price' => 28000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $svcKinesio   = DB::table('services')->insertGetId(['name' => 'Kinesiología',      'duration_minutes' => 60, 'slot_interval_minutes' => 15, 'min_duration_minutes' => 45, 'max_duration_minutes' => 120, 'price' => 40000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $svcDrenaje   = DB::table('services')->insertGetId(['name' => 'Drenaje Linfático', 'duration_minutes' => 90, 'slot_interval_minutes' => 15, 'min_duration_minutes' => 60, 'max_duration_minutes' => 120, 'price' => 45000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
 
         // ── Providers ─────────────────────────────────────────────────
-        $pMaria  = DB::table('providers')->insertGetId(['first_name' => 'María',  'last_name' => 'González', 'email' => 'maria@kinesilk.cl',  'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $pCarlos = DB::table('providers')->insertGetId(['first_name' => 'Carlos', 'last_name' => 'Rojas',    'email' => 'carlos@kinesilk.cl', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $pAna    = DB::table('providers')->insertGetId(['first_name' => 'Ana',    'last_name' => 'Fernández','email' => 'ana@kinesilk.cl',    'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $pDiego  = DB::table('providers')->insertGetId(['first_name' => 'Diego',  'last_name' => 'Morales',  'email' => 'diego@kinesilk.cl',  'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $pMaria  = DB::table('providers')->insertGetId(['first_name' => 'María',  'last_name' => 'González', 'email' => 'maria@kinesilk.cl',  'phone' => '+56912345001', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $pCarlos = DB::table('providers')->insertGetId(['first_name' => 'Carlos', 'last_name' => 'Rojas',    'email' => 'carlos@kinesilk.cl', 'phone' => '+56912345002', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $pAna    = DB::table('providers')->insertGetId(['first_name' => 'Ana',    'last_name' => 'Fernández','email' => 'ana@kinesilk.cl',    'phone' => '+56912345003', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $pDiego  = DB::table('providers')->insertGetId(['first_name' => 'Diego',  'last_name' => 'Morales',  'email' => 'diego@kinesilk.cl',  'phone' => '+56912345004', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
 
         // ── Provider ↔ Location ───────────────────────────────────────
         DB::table('location_provider')->insert([
@@ -67,21 +67,22 @@ class TestDataSeeder extends Seeder
         // ── Clients ───────────────────────────────────────────────────
         $c = [];
         foreach ([
-            ['Laura',     'Martínez', 'laura@mail.com',   'female'],
-            ['Pedro',     'Soto',     'pedro@mail.com',   'male'],
-            ['Valentina', 'López',    'vale@mail.com',    'female'],
-            ['Andrés',    'García',   'andres@mail.com',  'male'],
-            ['Camila',    'Torres',   'camila@mail.com',  'female'],
-            ['Rodrigo',   'Vega',     'rodrigo@mail.com', 'male'],
-            ['Sofía',     'Herrera',  'sofia@mail.com',   'female'],
-            ['Matías',    'Díaz',     'matias@mail.com',  'male'],
-            ['Isadora',   'Muñoz',    'isadora@mail.com', 'female'],
-            ['Felipe',    'Castro',   'felipe@mail.com',  'male'],
-        ] as [$fn, $ln, $email, $gender]) {
+            ['Laura',     'Martínez', 'laura@mail.com',   '+56911111001', 'female'],
+            ['Pedro',     'Soto',     'pedro@mail.com',   '+56911111002', 'male'],
+            ['Valentina', 'López',    'vale@mail.com',    '+56911111003', 'female'],
+            ['Andrés',    'García',   'andres@mail.com',  '+56911111004', 'male'],
+            ['Camila',    'Torres',   'camila@mail.com',  '+56911111005', 'female'],
+            ['Rodrigo',   'Vega',     'rodrigo@mail.com', '+56911111006', 'male'],
+            ['Sofía',     'Herrera',  'sofia@mail.com',   '+56911111007', 'female'],
+            ['Matías',    'Díaz',     'matias@mail.com',  '+56911111008', 'male'],
+            ['Isadora',   'Muñoz',    'isadora@mail.com', '+56911111009', 'female'],
+            ['Felipe',    'Castro',   'felipe@mail.com',  '+56911111010', 'male'],
+        ] as [$fn, $ln, $email, $phone, $gender]) {
             $c[] = DB::table('clients')->insertGetId([
-                'first_name' => $fn, 'last_name' => $ln,
-                'email' => $email,   'gender'    => $gender,
-                'active' => true,    'created_at' => now(), 'updated_at' => now(),
+                'first_name' => $fn,    'last_name' => $ln,
+                'email'      => $email, 'phone'     => $phone,
+                'gender'     => $gender,'active'    => true,
+                'created_at' => now(),  'updated_at' => now(),
             ]);
         }
 
@@ -94,56 +95,62 @@ class TestDataSeeder extends Seeder
             ['name' => 'Diego Morales',  'email' => 'diego@kinesilk.cl',  'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pDiego, 'created_at' => now(), 'updated_at' => now()],
         ]);
 
-        // ── Bookings semana 27 abr – 3 may 2026 ──────────────────────
-        // Columnas: [start, end, client, service, provider, location, status, price, payment]
-        // payment: null=sin sale | 'paid'=pagado total | 'partial'=50% | 'unpaid'=sale sin pago
+        // ── Bookings semana 4–10 may 2026 ────────────────────────────
+        // [start, end, client, service, provider, location, status, price, payment]
+        // status: 1=Reservado 2=Confirmado 3=Asiste 4=NoAsistio 5=Pendiente 6=EnEspera 7=Cancelada
+        // payment: null=sin sale | 'paid'=total | 'partial'=50% | 'unpaid'=sale sin pago
 
         $bookings = [
-            // Lunes 27 abr
-            ['2026-04-27 09:00', '2026-04-27 10:00', $c[0], $svcRelajante, $pMaria,  $locCentro,      2, 35000, 'paid'],
-            ['2026-04-27 10:15', '2026-04-27 11:15', $c[1], $svcRelajante, $pMaria,  $locCentro,      3, 35000, 'paid'],
-            ['2026-04-27 11:30', '2026-04-27 12:15', $c[2], $svcDeportivo, $pCarlos, $locLasCondes,   2, 28000, 'partial'],
-            ['2026-04-27 14:00', '2026-04-27 15:00', $c[3], $svcKinesio,   $pAna,    $locProvidencia, 1, 40000, null],
-            ['2026-04-27 15:30', '2026-04-27 17:00', $c[4], $svcDrenaje,   $pDiego,  $locCentro,      5, 45000, null],
+            // Lunes 4 may
+            ['2026-05-04 09:00', '2026-05-04 10:00', $c[0], $svcRelajante, $pMaria,  $locCentro,      2, 35000, 'paid'],
+            ['2026-05-04 10:15', '2026-05-04 11:15', $c[1], $svcRelajante, $pMaria,  $locCentro,      3, 35000, 'paid'],
+            ['2026-05-04 11:30', '2026-05-04 12:15', $c[2], $svcDeportivo, $pCarlos, $locLasCondes,   2, 28000, 'partial'],
+            ['2026-05-04 14:00', '2026-05-04 15:00', $c[3], $svcKinesio,   $pAna,    $locProvidencia, 1, 40000, null],
+            ['2026-05-04 15:30', '2026-05-04 17:00', $c[4], $svcDrenaje,   $pDiego,  $locCentro,      5, 45000, null],
+            ['2026-05-04 17:15', '2026-05-04 18:15', $c[5], $svcRelajante, $pAna,    $locLasCondes,   6, 35000, null],
 
-            // Martes 28 abr
-            ['2026-04-28 09:00', '2026-04-28 10:30', $c[4], $svcDrenaje,   $pMaria,  $locCentro,      3, 45000, 'paid'],
-            ['2026-04-28 10:30', '2026-04-28 11:15', $c[5], $svcDeportivo, $pCarlos, $locLasCondes,   2, 28000, 'partial'],
-            ['2026-04-28 14:00', '2026-04-28 15:00', $c[6], $svcKinesio,   $pDiego,  $locProvidencia, 5, 40000, null],
-            ['2026-04-28 15:30', '2026-04-28 16:30', $c[0], $svcRelajante, $pAna,    $locLasCondes,   1, 35000, null],
-            ['2026-04-28 17:00', '2026-04-28 18:00', $c[7], $svcKinesio,   $pAna,    $locProvidencia, 6, 40000, null],
+            // Martes 5 may
+            ['2026-05-05 09:00', '2026-05-05 10:30', $c[6], $svcDrenaje,   $pMaria,  $locCentro,      2, 45000, 'paid'],
+            ['2026-05-05 10:30', '2026-05-05 11:15', $c[7], $svcDeportivo, $pCarlos, $locLasCondes,   3, 28000, 'paid'],
+            ['2026-05-05 11:30', '2026-05-05 12:30', $c[8], $svcKinesio,   $pCarlos, $locLasCondes,   2, 40000, 'partial'],
+            ['2026-05-05 14:00', '2026-05-05 15:00', $c[9], $svcKinesio,   $pDiego,  $locProvidencia, 1, 40000, null],
+            ['2026-05-05 15:30', '2026-05-05 16:30', $c[0], $svcRelajante, $pAna,    $locLasCondes,   5, 35000, null],
+            ['2026-05-05 17:00', '2026-05-05 18:30', $c[3], $svcDrenaje,   $pDiego,  $locProvidencia, 6, 45000, null],
 
-            // Miércoles 29 abr
-            ['2026-04-29 09:00', '2026-04-29 10:30', $c[7], $svcDrenaje,   $pMaria,  $locCentro,      3, 45000, 'paid'],
-            ['2026-04-29 11:00', '2026-04-29 11:45', $c[8], $svcDeportivo, $pCarlos, $locCentro,      4, 28000, 'unpaid'],
-            ['2026-04-29 13:00', '2026-04-29 14:00', $c[1], $svcKinesio,   $pCarlos, $locLasCondes,   7, 40000, null],
-            ['2026-04-29 15:00', '2026-04-29 16:00', $c[9], $svcRelajante, $pAna,    $locProvidencia, 2, 35000, 'partial'],
-            ['2026-04-29 16:30', '2026-04-29 18:00', $c[3], $svcDrenaje,   $pDiego,  $locProvidencia, 1, 45000, null],
+            // Miércoles 6 may
+            ['2026-05-06 09:00', '2026-05-06 10:00', $c[1], $svcRelajante, $pMaria,  $locCentro,      3, 35000, 'paid'],
+            ['2026-05-06 10:15', '2026-05-06 11:00', $c[2], $svcDeportivo, $pCarlos, $locCentro,      4, 28000, 'unpaid'],
+            ['2026-05-06 11:30', '2026-05-06 12:30', $c[4], $svcKinesio,   $pAna,    $locProvidencia, 2, 40000, 'partial'],
+            ['2026-05-06 13:00', '2026-05-06 14:00', $c[5], $svcRelajante, $pAna,    $locLasCondes,   7, 35000, null],
+            ['2026-05-06 14:30', '2026-05-06 16:00', $c[6], $svcDrenaje,   $pMaria,  $locCentro,      1, 45000, null],
+            ['2026-05-06 16:30', '2026-05-06 17:30', $c[9], $svcKinesio,   $pDiego,  $locProvidencia, 2, 40000, 'paid'],
 
-            // Jueves 30 abr
-            ['2026-04-30 09:30', '2026-04-30 10:30', $c[2], $svcRelajante, $pMaria,  $locCentro,      2, 35000, 'paid'],
-            ['2026-04-30 11:00', '2026-04-30 12:00', $c[3], $svcKinesio,   $pCarlos, $locLasCondes,   3, 40000, 'paid'],
-            ['2026-04-30 14:00', '2026-04-30 15:30', $c[4], $svcDrenaje,   $pDiego,  $locProvidencia, 6, 45000, null],
-            ['2026-04-30 16:00', '2026-04-30 16:45', $c[5], $svcDeportivo, $pAna,    $locLasCondes,   1, 28000, null],
-            ['2026-04-30 17:00', '2026-04-30 18:00', $c[8], $svcRelajante, $pMaria,  $locLasCondes,   5, 35000, null],
+            // Jueves 7 may
+            ['2026-05-07 09:00', '2026-05-07 10:00', $c[7], $svcRelajante, $pMaria,  $locCentro,      2, 35000, 'paid'],
+            ['2026-05-07 10:15', '2026-05-07 11:00', $c[8], $svcDeportivo, $pCarlos, $locLasCondes,   3, 28000, 'paid'],
+            ['2026-05-07 11:30', '2026-05-07 13:00', $c[0], $svcDrenaje,   $pMaria,  $locCentro,      2, 45000, 'partial'],
+            ['2026-05-07 14:00', '2026-05-07 15:00', $c[1], $svcKinesio,   $pAna,    $locProvidencia, 5, 40000, null],
+            ['2026-05-07 15:30', '2026-05-07 16:15', $c[4], $svcDeportivo, $pDiego,  $locCentro,      1, 28000, null],
+            ['2026-05-07 17:00', '2026-05-07 18:00', $c[3], $svcRelajante, $pAna,    $locLasCondes,   6, 35000, null],
 
-            // Viernes 1 may
-            ['2026-05-01 09:00', '2026-05-01 10:00', $c[6], $svcRelajante, $pMaria,  $locCentro,      2, 35000, 'partial'],
-            ['2026-05-01 10:30', '2026-05-01 11:15', $c[7], $svcDeportivo, $pCarlos, $locLasCondes,   1, 28000, null],
-            ['2026-05-01 13:00', '2026-05-01 14:30', $c[8], $svcDrenaje,   $pAna,    $locProvidencia, 7, 45000, null],
-            ['2026-05-01 15:00', '2026-05-01 16:00', $c[9], $svcKinesio,   $pDiego,  $locCentro,      2, 40000, 'paid'],
-            ['2026-05-01 16:30', '2026-05-01 17:30', $c[0], $svcRelajante, $pAna,    $locLasCondes,   3, 35000, 'paid'],
+            // Viernes 8 may
+            ['2026-05-08 09:00', '2026-05-08 10:00', $c[2], $svcRelajante, $pMaria,  $locCentro,      2, 35000, 'paid'],
+            ['2026-05-08 10:30', '2026-05-08 12:00', $c[5], $svcDrenaje,   $pAna,    $locProvidencia, 3, 45000, 'paid'],
+            ['2026-05-08 12:15', '2026-05-08 13:00', $c[6], $svcDeportivo, $pCarlos, $locLasCondes,   7, 28000, null],
+            ['2026-05-08 14:00', '2026-05-08 15:00', $c[7], $svcKinesio,   $pDiego,  $locCentro,      2, 40000, 'partial'],
+            ['2026-05-08 15:30', '2026-05-08 16:30', $c[9], $svcRelajante, $pMaria,  $locLasCondes,   1, 35000, null],
+            ['2026-05-08 17:00', '2026-05-08 18:00', $c[8], $svcKinesio,   $pCarlos, $locLasCondes,   4, 40000, 'unpaid'],
 
-            // Sábado 2 may
-            ['2026-05-02 10:00', '2026-05-02 11:00', $c[0], $svcRelajante, $pMaria,  $locCentro,      3, 35000, 'paid'],
-            ['2026-05-02 11:30', '2026-05-02 12:30', $c[1], $svcKinesio,   $pCarlos, $locLasCondes,   5, 40000, null],
-            ['2026-05-02 14:00', '2026-05-02 15:30', $c[2], $svcDrenaje,   $pAna,    $locProvidencia, 1, 45000, null],
-            ['2026-05-02 16:00', '2026-05-02 16:45', $c[5], $svcDeportivo, $pDiego,  $locCentro,      4, 28000, 'unpaid'],
+            // Sábado 9 may
+            ['2026-05-09 10:00', '2026-05-09 11:00', $c[0], $svcRelajante, $pMaria,  $locCentro,      3, 35000, 'paid'],
+            ['2026-05-09 11:30', '2026-05-09 12:15', $c[3], $svcDeportivo, $pCarlos, $locLasCondes,   2, 28000, 'partial'],
+            ['2026-05-09 12:30', '2026-05-09 14:00', $c[4], $svcDrenaje,   $pAna,    $locProvidencia, 1, 45000, null],
+            ['2026-05-09 15:00', '2026-05-09 16:00', $c[1], $svcKinesio,   $pDiego,  $locCentro,      5, 40000, null],
 
-            // Domingo 3 may
-            ['2026-05-03 10:00', '2026-05-03 11:00', $c[3], $svcRelajante, $pDiego,  $locCentro,      2, 35000, 'partial'],
-            ['2026-05-03 12:00', '2026-05-03 12:45', $c[4], $svcDeportivo, $pMaria,  $locLasCondes,   6, 28000, null],
-            ['2026-05-03 14:00', '2026-05-03 15:00', $c[6], $svcKinesio,   $pCarlos, $locProvidencia, 1, 40000, null],
+            // Domingo 10 may
+            ['2026-05-10 10:00', '2026-05-10 11:00', $c[5], $svcRelajante, $pDiego,  $locCentro,      2, 35000, 'partial'],
+            ['2026-05-10 11:30', '2026-05-10 13:00', $c[7], $svcDrenaje,   $pMaria,  $locCentro,      1, 45000, null],
+            ['2026-05-10 14:00', '2026-05-10 15:00', $c[9], $svcKinesio,   $pCarlos, $locProvidencia, 6, 40000, null],
         ];
 
         foreach ($bookings as [$start, $end, $clientId, $serviceId, $providerId, $locationId, $statusId, $price, $payment]) {
