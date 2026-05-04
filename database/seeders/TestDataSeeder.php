@@ -153,6 +153,20 @@ class TestDataSeeder extends Seeder
             ['2026-05-10 14:00', '2026-05-10 15:00', $c[9], $svcKinesio,   $pCarlos, $locProvidencia, 6, 40000, null],
         ];
 
+        // ── Service packs ─────────────────────────────────────────────
+        $packRelajante6 = DB::table('service_packs')->insertGetId(['service_id' => $svcRelajante, 'name' => 'Pack Masaje Relajante x6', 'total_sessions' => 6, 'price' => 189000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $packKinesio8   = DB::table('service_packs')->insertGetId(['service_id' => $svcKinesio,   'name' => 'Pack Kinesiología x8',     'total_sessions' => 8, 'price' => 288000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $packDrenaje4   = DB::table('service_packs')->insertGetId(['service_id' => $svcDrenaje,   'name' => 'Pack Drenaje Linfático x4','total_sessions' => 4, 'price' => 160000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+
+        // ── Client packs ──────────────────────────────────────────────
+        // c[0]=Laura  — relajante x6, usadas 2 (lun idx0, mar idx10, sáb idx30 = sesiones 1/2/3)
+        $cp1 = DB::table('client_packs')->insertGetId(['client_id' => $c[0], 'service_pack_id' => $packRelajante6, 'total_sessions' => 6, 'used_sessions' => 2, 'status' => 'active', 'created_at' => now(), 'updated_at' => now()]);
+        // c[9]=Felipe — kinesiología x8, usadas 2 (mar idx9, mié idx17, dom idx36 = sesiones 1/2/3)
+        $cp2 = DB::table('client_packs')->insertGetId(['client_id' => $c[9], 'service_pack_id' => $packKinesio8,   'total_sessions' => 8, 'used_sessions' => 2, 'status' => 'active', 'created_at' => now(), 'updated_at' => now()]);
+        // c[6]=Sofía  — drenaje x4, usadas 2 (mar idx6, mié idx16 = sesiones 1/2)
+        $cp3 = DB::table('client_packs')->insertGetId(['client_id' => $c[6], 'service_pack_id' => $packDrenaje4,   'total_sessions' => 4, 'used_sessions' => 2, 'status' => 'active', 'created_at' => now(), 'updated_at' => now()]);
+
+        $bookingIds = [];
         foreach ($bookings as [$start, $end, $clientId, $serviceId, $providerId, $locationId, $statusId, $price, $payment]) {
             $bookingId = DB::table('bookings')->insertGetId([
                 'client_id'   => $clientId,
@@ -166,6 +180,7 @@ class TestDataSeeder extends Seeder
                 'created_at'  => now(),
                 'updated_at'  => now(),
             ]);
+            $bookingIds[] = $bookingId;
 
             if ($payment !== null) {
                 $paidAmount = match ($payment) {
@@ -184,5 +199,42 @@ class TestDataSeeder extends Seeder
                 ]);
             }
         }
+
+        // ── Pack sessions ─────────────────────────────────────────────
+        // Índices del array $bookings (0-based):
+        // 0=lun c[0] relajante | 10=mar c[0] relajante | 30=sáb c[0] relajante
+        // 9=mar c[9] kinesio   | 17=mié c[9] kinesio   | 36=dom c[9] kinesio
+        // 6=mar c[6] drenaje   | 16=mié c[6] drenaje
+
+        // Laura (c[0]) — relajante x6: sesión 1(lun), 2(mar), 3(sáb) agendada, 4-6 pendientes
+        DB::table('pack_sessions')->insert([
+            ['client_pack_id' => $cp1, 'booking_id' => $bookingIds[0],  'session_number' => 1, 'status' => 'attended',  'attended_at' => '2026-05-04 10:00:00', 'created_at' => now(), 'updated_at' => now()],
+            ['client_pack_id' => $cp1, 'booking_id' => $bookingIds[10], 'session_number' => 2, 'status' => 'attended',  'attended_at' => '2026-05-05 16:30:00', 'created_at' => now(), 'updated_at' => now()],
+            ['client_pack_id' => $cp1, 'booking_id' => $bookingIds[30], 'session_number' => 3, 'status' => 'scheduled', 'attended_at' => null,                  'created_at' => now(), 'updated_at' => now()],
+            ['client_pack_id' => $cp1, 'booking_id' => null,            'session_number' => 4, 'status' => 'pending',   'attended_at' => null,                  'created_at' => now(), 'updated_at' => now()],
+            ['client_pack_id' => $cp1, 'booking_id' => null,            'session_number' => 5, 'status' => 'pending',   'attended_at' => null,                  'created_at' => now(), 'updated_at' => now()],
+            ['client_pack_id' => $cp1, 'booking_id' => null,            'session_number' => 6, 'status' => 'pending',   'attended_at' => null,                  'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        // Felipe (c[9]) — kinesiología x8: sesión 1(mar), 2(mié), 3(dom) agendada, 4-8 pendientes
+        DB::table('pack_sessions')->insert([
+            ['client_pack_id' => $cp2, 'booking_id' => $bookingIds[9],  'session_number' => 1, 'status' => 'attended',  'attended_at' => '2026-05-05 15:00:00', 'created_at' => now(), 'updated_at' => now()],
+            ['client_pack_id' => $cp2, 'booking_id' => $bookingIds[17], 'session_number' => 2, 'status' => 'attended',  'attended_at' => '2026-05-06 17:30:00', 'created_at' => now(), 'updated_at' => now()],
+            ['client_pack_id' => $cp2, 'booking_id' => $bookingIds[36], 'session_number' => 3, 'status' => 'scheduled', 'attended_at' => null,                  'created_at' => now(), 'updated_at' => now()],
+            ['client_pack_id' => $cp2, 'booking_id' => null,            'session_number' => 4, 'status' => 'pending',   'attended_at' => null,                  'created_at' => now(), 'updated_at' => now()],
+            ['client_pack_id' => $cp2, 'booking_id' => null,            'session_number' => 5, 'status' => 'pending',   'attended_at' => null,                  'created_at' => now(), 'updated_at' => now()],
+            ['client_pack_id' => $cp2, 'booking_id' => null,            'session_number' => 6, 'status' => 'pending',   'attended_at' => null,                  'created_at' => now(), 'updated_at' => now()],
+            ['client_pack_id' => $cp2, 'booking_id' => null,            'session_number' => 7, 'status' => 'pending',   'attended_at' => null,                  'created_at' => now(), 'updated_at' => now()],
+            ['client_pack_id' => $cp2, 'booking_id' => null,            'session_number' => 8, 'status' => 'pending',   'attended_at' => null,                  'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        // Sofía (c[6]) — drenaje x4: sesión 1(mar), 2(mié), 3-4 pendientes
+        DB::table('pack_sessions')->insert([
+            ['client_pack_id' => $cp3, 'booking_id' => $bookingIds[6],  'session_number' => 1, 'status' => 'attended',  'attended_at' => '2026-05-05 10:30:00', 'created_at' => now(), 'updated_at' => now()],
+            ['client_pack_id' => $cp3, 'booking_id' => $bookingIds[16], 'session_number' => 2, 'status' => 'attended',  'attended_at' => '2026-05-06 16:00:00', 'created_at' => now(), 'updated_at' => now()],
+            ['client_pack_id' => $cp3, 'booking_id' => null,            'session_number' => 3, 'status' => 'pending',   'attended_at' => null,                  'created_at' => now(), 'updated_at' => now()],
+            ['client_pack_id' => $cp3, 'booking_id' => null,            'session_number' => 4, 'status' => 'pending',   'attended_at' => null,                  'created_at' => now(), 'updated_at' => now()],
+        ]);
+    }
     }
 }
