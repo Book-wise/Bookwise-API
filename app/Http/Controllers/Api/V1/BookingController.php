@@ -19,7 +19,7 @@ class BookingController extends Controller
     {
         $user = $request->user();
 
-        $bookings = Booking::with(['client', 'service', 'provider', 'location', 'status', 'sale'])
+        $bookings = Booking::with(['client', 'service', 'provider', 'location', 'status', 'sale', 'packSession.clientPack'])
             // Provider filter: only show bookings for their locations
             ->when($user?->role?->value === 'provider', function ($query) use ($user) {
                 $provider = $user->provider;
@@ -45,7 +45,7 @@ class BookingController extends Controller
     // ── GET /v1/bookings/{id} ──────────────────────────────────────
     public function show(int $id): JsonResponse
     {
-        $booking = Booking::with(['client', 'service', 'provider', 'location', 'status', 'statusHistory.status', 'sale'])
+        $booking = Booking::with(['client', 'service', 'provider', 'location', 'status', 'statusHistory.status', 'sale', 'packSession.clientPack'])
             ->findOrFail($id);
 
         return response()->json(['data' => new BookingResource($booking)]);

@@ -32,6 +32,16 @@ class BookingResource extends JsonResource
             ],
             'payment_status'             => $this->whenLoaded('sale', fn() => $this->sale->payment_status, null),
             'payment'                    => new PaymentResource($this->whenLoaded('sale')),
+            'pack_session'               => $this->whenLoaded('packSession', function () {
+                $ps = $this->packSession;
+                if (! $ps) return null;
+                return [
+                    'session_number'  => $ps->session_number,
+                    'total_sessions'  => $ps->clientPack?->total_sessions,
+                    'client_pack_id'  => $ps->client_pack_id,
+                    'status'          => $ps->status,
+                ];
+            }),
         ];
     }
 }

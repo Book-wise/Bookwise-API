@@ -60,6 +60,11 @@ class Booking extends Model
         return $this->hasOne(Sale::class);
     }
 
+    public function packSession()
+    {
+        return $this->hasOne(PackSession::class);
+    }
+
     // ── Scopes ─────────────────────────────────────────────────────
 
     public function scopeActive($query)
