@@ -130,17 +130,6 @@ class BookingController extends Controller
             'provider_id' => ['sometimes', 'nullable', 'integer', 'exists:providers,id'],
         ]);
 
-        // Proteger contra cancelación directa via update
-        if (isset($validated['status_id'])) {
-            $status = BookingStatus::findOrFail($validated['status_id']);
-            if ($status->is_cancellation) {
-                return response()->json([
-                    'error'  => 'forbidden',
-                    'detail' => 'Use PATCH /bookings/{id}/cancel to cancel a booking.',
-                ], 403);
-            }
-        }
-
         // Check for booking overlaps if time, location, or client is being changed
         if (isset($validated['start_time']) || isset($validated['end_time'])
             || isset($validated['location_id']) || isset($validated['client_id'])) {
