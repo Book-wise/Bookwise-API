@@ -48,7 +48,7 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
         ->middleware('scope:bookings:write');
     Route::patch('/bookings/{id}',        [BookingController::class, 'update'])
         ->middleware('scope:bookings:write')
-        ->middleware('check.role:provider,admin');
+        ->middleware('role:provider,admin');
     Route::patch('/bookings/{id}/cancel', [BookingController::class, 'cancel'])
         ->middleware('scope:bookings:write');
 
