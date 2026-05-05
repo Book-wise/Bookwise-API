@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\LocationController;
 use App\Http\Controllers\Api\V1\SaleController;
 use App\Http\Controllers\Api\V1\CustomAttributeController;
 use App\Http\Controllers\Api\V1\WebhookController;
+use App\Http\Controllers\Api\V1\BlockedSlotController;
 use App\Http\Controllers\Api\V1\ServicePackController;
 use App\Http\Controllers\Api\V1\ClientPackController;
 
@@ -91,6 +92,16 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
     Route::post('/client-packs',           [ClientPackController::class, 'store'])
         ->middleware('scope:clients:write');
     Route::patch('/client-packs/{id}/use', [ClientPackController::class, 'use'])
+        ->middleware('scope:bookings:write');
+
+    // Blocked slots
+    Route::get('/blocked-slots',                           [BlockedSlotController::class, 'index'])
+        ->middleware('scope:bookings:read');
+    Route::post('/blocked-slots',                          [BlockedSlotController::class, 'store'])
+        ->middleware('scope:bookings:write');
+    Route::delete('/blocked-slots/{id}',                   [BlockedSlotController::class, 'destroy'])
+        ->middleware('scope:bookings:write');
+    Route::delete('/blocked-slots/group/{repeatGroupId}',  [BlockedSlotController::class, 'destroyGroup'])
         ->middleware('scope:bookings:write');
 
     // Me
