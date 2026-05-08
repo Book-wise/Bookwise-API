@@ -72,8 +72,10 @@ class ClientPackController extends Controller
 
     public function use(int $id, Request $request): JsonResponse
     {
-        $pack = ClientPack::where('client_id', $request->user()->id)
-            ->findOrFail($id);
+        $pack = ClientPack::when(
+            !$request->user()->isAdmin(),
+            fn($q) => $q->where('client_id', $request->user()->id)
+        )->findOrFail($id);
 
         if ($pack->status !== 'active') {
             return response()->json([
@@ -120,7 +122,7 @@ class ClientPackController extends Controller
 
     public function clientPacks(int $clientId): JsonResponse
     {
-        $packs = ClientPack::with(['servicePack.service', 'sessions'])
+        $packs = ClientPack::with(['servicePack.service', 'sessions.booking'])
             ->where('client_id', $clientId)
             ->orderBy('created_at', 'desc')
             ->get();

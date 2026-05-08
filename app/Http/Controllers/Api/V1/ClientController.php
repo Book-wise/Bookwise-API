@@ -29,6 +29,7 @@ class ClientController extends Controller
     public function index(Request $request): JsonResponse
     {
         $clients = Client::query()
+            ->when($request->email,  fn($q) => $q->where('email', $request->email))
             ->when($request->search, fn($q) => $q
                 ->where('first_name', 'like', "%{$request->search}%")
                 ->orWhere('last_name',  'like', "%{$request->search}%")
