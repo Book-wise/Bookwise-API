@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\V1\ClientResource;
 use App\Models\Client;
+use App\Rules\ChileanRutRule;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -61,8 +62,10 @@ class ClientController extends Controller
             'last_name'      => ['nullable', 'string', 'max:100'],
             'email'          => ['nullable', 'email', 'unique:clients,email'],
             'phone'          => ['nullable', 'string', 'max:20'],
+            'rut'            => ['nullable', 'string', 'max:12', new ChileanRutRule(), 'unique:clients,rut'],
             'gender'         => ['nullable', 'in:male,female,other'],
             'wc_customer_id' => ['nullable', 'integer'],
+            'notes'          => ['nullable', 'string'],
         ]);
 
         $client = Client::create($validated);
@@ -80,8 +83,10 @@ class ClientController extends Controller
             'last_name'      => ['sometimes', 'nullable', 'string', 'max:100'],
             'email'          => ['sometimes', 'email', 'unique:clients,email,' . $id],
             'phone'          => ['sometimes', 'nullable', 'string', 'max:20'],
+            'rut'            => ['sometimes', 'nullable', 'string', 'max:12', new ChileanRutRule(), 'unique:clients,rut,' . $id],
             'gender'         => ['sometimes', 'nullable', 'in:male,female,other'],
             'wc_customer_id' => ['sometimes', 'nullable', 'integer'],
+            'notes'          => ['sometimes', 'nullable', 'string'],
         ]);
 
         $client->update($validated);

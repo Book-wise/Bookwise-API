@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Location extends Model
@@ -17,9 +18,9 @@ class Location extends Model
         'active' => 'boolean',
     ];
 
-    public function providers()
+    public function providers(): HasMany
     {
-        return $this->belongsToMany(Provider::class);
+        return $this->hasMany(Provider::class);
     }
 
     public function bookings()

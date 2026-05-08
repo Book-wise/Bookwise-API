@@ -15,8 +15,11 @@ class ClientResource extends JsonResource
             'last_name'      => $this->last_name,
             'email'          => $this->email,
             'phone'          => $this->phone,
+            'rut'            => $this->rut,
             'gender'         => $this->gender,
             'wc_customer_id' => $this->wc_customer_id,
+            'address'        => $this->address,
+            'notes'          => $this->notes,
             'active'         => $this->active,
             'created_at'     => $this->created_at?->toIso8601String(),
         ];

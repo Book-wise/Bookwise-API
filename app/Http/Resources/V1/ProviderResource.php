@@ -16,7 +16,7 @@ class ProviderResource extends JsonResource
             'email'      => $this->email,
             'phone'      => $this->phone,
             'active'     => $this->active,
-            'locations'  => LocationResource::collection($this->whenLoaded('locations')),
+            'location'  => new LocationResource($this->whenLoaded('location')),
             'services'   => ServiceResource::collection($this->whenLoaded('services')),
         ];
     }

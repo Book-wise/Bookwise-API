@@ -22,35 +22,45 @@ class TestDataSeeder extends Seeder
         $svcDrenaje   = DB::table('services')->insertGetId(['name' => 'Drenaje Linfático', 'duration_minutes' => 90, 'slot_interval_minutes' => 15, 'min_duration_minutes' => 60, 'max_duration_minutes' => 120, 'price' => 45000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
 
         // ── Providers ─────────────────────────────────────────────────
-        $pMaria  = DB::table('providers')->insertGetId(['first_name' => 'María',  'last_name' => 'González', 'email' => 'maria@kinesilk.cl',  'phone' => '+56912345001', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $pCarlos = DB::table('providers')->insertGetId(['first_name' => 'Carlos', 'last_name' => 'Rojas',    'email' => 'carlos@kinesilk.cl', 'phone' => '+56912345002', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $pAna    = DB::table('providers')->insertGetId(['first_name' => 'Ana',    'last_name' => 'Fernández','email' => 'ana@kinesilk.cl',    'phone' => '+56912345003', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $pDiego  = DB::table('providers')->insertGetId(['first_name' => 'Diego',  'last_name' => 'Morales',  'email' => 'diego@kinesilk.cl',  'phone' => '+56912345004', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-
-        // ── Provider ↔ Location ───────────────────────────────────────
-        DB::table('location_provider')->insert([
-            ['location_id' => $locCentro,      'provider_id' => $pMaria],
-            ['location_id' => $locLasCondes,   'provider_id' => $pMaria],
-            ['location_id' => $locCentro,      'provider_id' => $pCarlos],
-            ['location_id' => $locLasCondes,   'provider_id' => $pCarlos],
-            ['location_id' => $locLasCondes,   'provider_id' => $pAna],
-            ['location_id' => $locProvidencia, 'provider_id' => $pAna],
-            ['location_id' => $locCentro,      'provider_id' => $pDiego],
-            ['location_id' => $locProvidencia, 'provider_id' => $pDiego],
-        ]);
+        // Centro: María, Carmen, Jorge
+        $pMaria  = DB::table('providers')->insertGetId(['first_name' => 'María',  'last_name' => 'González',   'email' => 'maria@kinesilk.cl',  'phone' => '+56912345001', 'location_id' => $locCentro,      'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $pCarmen = DB::table('providers')->insertGetId(['first_name' => 'Carmen', 'last_name' => 'Lira',       'email' => 'carmen@kinesilk.cl', 'phone' => '+56912345005', 'location_id' => $locCentro,      'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $pJorge  = DB::table('providers')->insertGetId(['first_name' => 'Jorge',  'last_name' => 'Peralta',   'email' => 'jorge@kinesilk.cl',  'phone' => '+56912345006', 'location_id' => $locCentro,      'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        // Las Condes: Carlos, Pilar, Sebastián
+        $pCarlos = DB::table('providers')->insertGetId(['first_name' => 'Carlos', 'last_name' => 'Rojas',      'email' => 'carlos@kinesilk.cl', 'phone' => '+56912345002', 'location_id' => $locLasCondes,   'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $pPilar  = DB::table('providers')->insertGetId(['first_name' => 'Pilar',  'last_name' => 'Navarrete', 'email' => 'pilar@kinesilk.cl',  'phone' => '+56912345007', 'location_id' => $locLasCondes,   'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $pSebas  = DB::table('providers')->insertGetId(['first_name' => 'Sebastián','last_name' => 'Aguilar', 'email' => 'sebastian@kinesilk.cl','phone' => '+56912345008', 'location_id' => $locLasCondes,   'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        // Providencia: Ana, Diego, Claudia
+        $pAna    = DB::table('providers')->insertGetId(['first_name' => 'Ana',    'last_name' => 'Fernández',  'email' => 'ana@kinesilk.cl',    'phone' => '+56912345003', 'location_id' => $locProvidencia, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $pDiego  = DB::table('providers')->insertGetId(['first_name' => 'Diego',  'last_name' => 'Morales',    'email' => 'diego@kinesilk.cl',  'phone' => '+56912345004', 'location_id' => $locProvidencia, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $pClaudia= DB::table('providers')->insertGetId(['first_name' => 'Claudia','last_name' => 'Sandoval',  'email' => 'claudia@kinesilk.cl', 'phone' => '+56912345009', 'location_id' => $locProvidencia, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
 
         // ── Provider ↔ Service ────────────────────────────────────────
         DB::table('provider_service')->insert([
+            // Centro
             ['provider_id' => $pMaria,  'service_id' => $svcRelajante],
             ['provider_id' => $pMaria,  'service_id' => $svcDrenaje],
+            ['provider_id' => $pCarmen, 'service_id' => $svcDeportivo],
+            ['provider_id' => $pCarmen, 'service_id' => $svcKinesio],
+            ['provider_id' => $pJorge,  'service_id' => $svcRelajante],
+            ['provider_id' => $pJorge,  'service_id' => $svcKinesio],
+            ['provider_id' => $pJorge,  'service_id' => $svcDrenaje],
+            // Las Condes
             ['provider_id' => $pCarlos, 'service_id' => $svcDeportivo],
             ['provider_id' => $pCarlos, 'service_id' => $svcKinesio],
+            ['provider_id' => $pPilar,  'service_id' => $svcRelajante],
+            ['provider_id' => $pPilar,  'service_id' => $svcDrenaje],
+            ['provider_id' => $pSebas,  'service_id' => $svcKinesio],
+            ['provider_id' => $pSebas,  'service_id' => $svcDeportivo],
+            // Providencia
             ['provider_id' => $pAna,    'service_id' => $svcRelajante],
             ['provider_id' => $pAna,    'service_id' => $svcKinesio],
             ['provider_id' => $pAna,    'service_id' => $svcDrenaje],
             ['provider_id' => $pDiego,  'service_id' => $svcKinesio],
             ['provider_id' => $pDiego,  'service_id' => $svcDeportivo],
             ['provider_id' => $pDiego,  'service_id' => $svcRelajante],
+            ['provider_id' => $pClaudia,'service_id' => $svcDrenaje],
+            ['provider_id' => $pClaudia,'service_id' => $svcRelajante],
         ]);
 
         // ── Booking statuses — IDs fijos para coincidir con el front ──
@@ -66,22 +76,24 @@ class TestDataSeeder extends Seeder
 
         // ── Clients ───────────────────────────────────────────────────
         $c = [];
-        foreach ([
-            ['Laura',     'Martínez', 'laura@mail.com',   '+56911111001', 'female'],
-            ['Pedro',     'Soto',     'pedro@mail.com',   '+56911111002', 'male'],
-            ['Valentina', 'López',    'vale@mail.com',    '+56911111003', 'female'],
-            ['Andrés',    'García',   'andres@mail.com',  '+56911111004', 'male'],
-            ['Camila',    'Torres',   'camila@mail.com',  '+56911111005', 'female'],
-            ['Rodrigo',   'Vega',     'rodrigo@mail.com', '+56911111006', 'male'],
-            ['Sofía',     'Herrera',  'sofia@mail.com',   '+56911111007', 'female'],
-            ['Matías',    'Díaz',     'matias@mail.com',  '+56911111008', 'male'],
-            ['Isadora',   'Muñoz',    'isadora@mail.com', '+56911111009', 'female'],
-            ['Felipe',    'Castro',   'felipe@mail.com',  '+56911111010', 'male'],
-        ] as [$fn, $ln, $email, $phone, $gender]) {
+        $clients = [
+            ['Laura',     'Martínez', 'laura@mail.com',   '+56911111001', 'female', '12345678-5',  'Cliente regular, prefiere horarios de mañana'],
+            ['Pedro',     'Soto',     'pedro@mail.com',   '+56911111002', 'male',   '87654321-0',  'Requiere disponibilidad post-work'],
+            ['Valentina', 'López',    'vale@mail.com',    '+56911111003', 'female', '11222333-4',  null],
+            ['Andrés',    'García',   'andres@mail.com',  '+56911111004', 'male',   '44556677-8',  'Alergia a aceites esenciales'],
+            ['Camila',    'Torres',   'camila@mail.com',  '+56911111005', 'female', '99887766-1',  null],
+            ['Rodrigo',   'Vega',     'rodrigo@mail.com', '+56911111006', 'male',   '55667788-3',  'Prefiere masajes deportivo'],
+            ['Sofía',     'Herrera',  'sofia@mail.com',   '+56911111007', 'female', '22334455-9',  null],
+            ['Matías',    'Díaz',     'matias@mail.com',  '+56911111008', 'male',   '77112233-K',  'Programación de sesiones semanales'],
+            ['Isadora',   'Muñoz',    'isadora@mail.com', '+56911111009', 'female', '33445566-7',  null],
+            ['Felipe',    'Castro',   'felipe@mail.com',  '+56911111010', 'male',   '66778899-2',  'Tiene pack de kinesiología activo'],
+        ];
+        foreach ($clients as [$fn, $ln, $email, $phone, $gender, $rut, $notes]) {
             $c[] = DB::table('clients')->insertGetId([
                 'first_name' => $fn,    'last_name' => $ln,
                 'email'      => $email, 'phone'     => $phone,
-                'gender'     => $gender,'active'    => true,
+                'rut'        => $rut,   'gender'    => $gender,
+                'notes'      => $notes, 'active'    => true,
                 'created_at' => now(),  'updated_at' => now(),
             ]);
         }
@@ -89,11 +101,19 @@ class TestDataSeeder extends Seeder
         // ── Users ─────────────────────────────────────────────────────
         DB::table('users')->insert([
             ['name' => 'Admin Kinesilk',     'email' => 'admin@kinesilk.cl',     'password' => Hash::make('password'), 'role' => 'admin',    'provider_id' => null,    'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'WooCommerce Bridge',  'email' => 'wc@kinesilk.cl',        'password' => Hash::make('wc-bridge-2026'), 'role' => 'woocommerce', 'provider_id' => null, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'María González',     'email' => 'maria@kinesilk.cl',     'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pMaria, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'Carlos Rojas',       'email' => 'carlos@kinesilk.cl',    'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pCarlos,'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'Ana Fernández',      'email' => 'ana@kinesilk.cl',       'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pAna,   'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'Diego Morales',      'email' => 'diego@kinesilk.cl',     'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pDiego, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'WooCommerce Bridge', 'email' => 'wc@kinesilk.cl',        'password' => Hash::make('wc-bridge-2026'), 'role' => 'woocommerce', 'provider_id' => null, 'created_at' => now(), 'updated_at' => now()],
+            // Centro
+            ['name' => 'María González',     'email' => 'maria@kinesilk.cl',     'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pMaria,  'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Carmen Lira',        'email' => 'carmen@kinesilk.cl',    'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pCarmen, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Jorge Peralta',      'email' => 'jorge@kinesilk.cl',     'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pJorge,  'created_at' => now(), 'updated_at' => now()],
+            // Las Condes
+            ['name' => 'Carlos Rojas',       'email' => 'carlos@kinesilk.cl',    'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pCarlos, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Pilar Navarrete',    'email' => 'pilar@kinesilk.cl',     'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pPilar,  'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Sebastián Aguilar',  'email' => 'sebastian@kinesilk.cl','password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pSebas,  'created_at' => now(), 'updated_at' => now()],
+            // Providencia
+            ['name' => 'Ana Fernández',      'email' => 'ana@kinesilk.cl',       'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pAna,    'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Diego Morales',      'email' => 'diego@kinesilk.cl',     'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pDiego,  'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Claudia Sandoval',   'email' => 'claudia@kinesilk.cl',   'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pClaudia,'created_at' => now(), 'updated_at' => now()],
         ]);
 
         // ── Bookings semana 4–10 may 2026 ────────────────────────────

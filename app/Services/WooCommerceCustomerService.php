@@ -15,13 +15,11 @@ class WooCommerceCustomerService
     {
         $billing = $data['billing'] ?? [];
         $customerId = $data['id'] ?? null;
+        $metaData = $data['meta_data'] ?? [];
 
-        // Build name from first_name + last_name
         $firstName = $data['first_name'] ?? ($billing['first_name'] ?? '');
         $lastName = $data['last_name'] ?? ($billing['last_name'] ?? '');
-        $fullName = trim($firstName . ' ' . $lastName);
 
-        // Build address from billing address lines
         $addressParts = [
             $billing['address_1'] ?? '',
             $billing['address_2'] ?? '',
@@ -32,30 +30,39 @@ class WooCommerceCustomerService
         ];
         $address = collect($addressParts)->filter()->join(', ');
 
-        // Find by wc_customer_id OR email (unique per WC customer)
+        $rut = null;
+        if (!empty($metaData)) {
+            $rutMeta = collect($metaData)->firstWhere('key', '_billing_rut');
+            $rut = $rutMeta['value'] ?? null;
+        }
+
         $client = Client::where('wc_customer_id', $customerId)
             ->orWhere('email', $data['email'])
             ->first();
 
         $isNew = !$client;
 
+        $updateData = [
+            'first_name' => $firstName,
+            'last_name'  => $lastName,
+            'email'     => $data['email'],
+            'phone'     => $data['billing']['phone'] ?? $data['shipping']['phone'] ?? ($billing['phone'] ?? null),
+            'address'   => $address ?: null,
+            'active'    => true,
+        ];
+
+        if ($rut) {
+            $updateData['rut'] = $rut;
+        }
+
         $client = Client::updateOrCreate(
             [
                 'wc_customer_id' => $customerId,
             ],
-            [
-                'first_name' => $firstName,
-                'last_name'  => $lastName,
-                'email'     => $data['email'],
-                'phone'     => $data['billing']['phone'] ?? $data['shipping']['phone'] ?? ($billing['phone'] ?? null),
-                'address'   => $address ?: null,
-                'active'    => true,
-            ]
+            $updateData
         );
 
-        // If this was a customer.created event and it's new, log it
         if ($isNew && Str::contains($event, 'created')) {
-            // The webhook log is handled by WebhookController
         }
 
         return $client;

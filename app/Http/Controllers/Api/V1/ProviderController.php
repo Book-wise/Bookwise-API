@@ -13,12 +13,10 @@ class ProviderController extends Controller
     public function index(Request $request): JsonResponse
     {
         $providers = Provider::query()
-            ->with(['locations', 'services'])
-            ->when($request->location_id, function($q) use ($request) {
-                $q->whereHas('locations', function($q) use ($request) {
-                    $q->where('locations.id', $request->location_id);
-                });
-            })
+            ->with(['location', 'services'])
+            ->when($request->location_id, fn($q) =>
+                $q->where('location_id', $request->location_id)
+            )
             ->when($request->service_id, function($q) use ($request) {
                 $q->whereHas('services', function($q) use ($request) {
                     $q->where('services.id', $request->service_id);
@@ -35,7 +33,7 @@ class ProviderController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $provider = Provider::with(['locations', 'services'])->findOrFail($id);
+        $provider = Provider::with(['location', 'services'])->findOrFail($id);
         return response()->json(['data' => new ProviderResource($provider)]);
     }
 }
