@@ -88,11 +88,12 @@ class TestDataSeeder extends Seeder
 
         // ── Users ─────────────────────────────────────────────────────
         DB::table('users')->insert([
-            ['name' => 'Admin Kinesilk', 'email' => 'admin@kinesilk.cl',  'password' => Hash::make('password'), 'role' => 'admin',    'provider_id' => null,    'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'María González', 'email' => 'maria@kinesilk.cl',  'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pMaria, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'Carlos Rojas',   'email' => 'carlos@kinesilk.cl', 'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pCarlos,'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'Ana Fernández',  'email' => 'ana@kinesilk.cl',    'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pAna,   'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'Diego Morales',  'email' => 'diego@kinesilk.cl',  'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pDiego, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Admin Kinesilk',     'email' => 'admin@kinesilk.cl',     'password' => Hash::make('password'), 'role' => 'admin',    'provider_id' => null,    'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'WooCommerce Bridge',  'email' => 'wc@kinesilk.cl',        'password' => Hash::make('wc-bridge-2026'), 'role' => 'woocommerce', 'provider_id' => null, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'María González',     'email' => 'maria@kinesilk.cl',     'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pMaria, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Carlos Rojas',       'email' => 'carlos@kinesilk.cl',    'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pCarlos,'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Ana Fernández',      'email' => 'ana@kinesilk.cl',       'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pAna,   'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Diego Morales',      'email' => 'diego@kinesilk.cl',     'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pDiego, 'created_at' => now(), 'updated_at' => now()],
         ]);
 
         // ── Bookings semana 4–10 may 2026 ────────────────────────────
