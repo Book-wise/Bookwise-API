@@ -19,7 +19,7 @@ class WebhookController extends Controller
 
     public function handle(Request $request): JsonResponse
     {
-        $secret    = env('WC_WEBHOOK_SECRET');
+        $secret    = config('services.woocommerce.webhook_secret');
         $payload   = $request->getContent();
         $signature = $request->header('X-WC-Webhook-Signature');
         $expected  = base64_encode(hash_hmac('sha256', $payload, $secret, true));
@@ -40,10 +40,12 @@ class WebhookController extends Controller
         $orderId = $data['id'] ?? null;
 
         $log = WoocommerceWebhooksLog::create([
-            'event'       => $event,
-            'wc_order_id' => $orderId,
-            'payload'     => $payload,
-            'status'      => 'received',
+            'event'        => $event,
+            'wc_order_id'  => $orderId,
+            'wc_entity_id' => $orderId,
+            'entity_type'  => 'order',
+            'payload'      => $payload,
+            'status'       => 'received',
         ]);
 
         try {
@@ -68,10 +70,11 @@ class WebhookController extends Controller
 
         // Log the customer event
         $log = WoocommerceWebhooksLog::create([
-            'event'       => $event,
-            'wc_order_id' => $customerId, // Reusing wc_order_id column for customer ID
-            'payload'     => json_encode($data),
-            'status'      => 'received',
+            'event'         => $event,
+            'wc_entity_id'  => $customerId,
+            'entity_type'   => 'customer',
+            'payload'       => json_encode($data),
+            'status'        => 'received',
         ]);
 
         try {

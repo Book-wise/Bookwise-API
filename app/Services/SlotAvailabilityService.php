@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Booking;
+use App\Models\Location;
 use App\Models\Service;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -23,17 +24,18 @@ class SlotAvailabilityService
 
         $duration = $durationMinutes
             ?? $service?->duration_minutes
-            ?? (int) env('BOOKING_DEFAULT_DURATION_MINUTES', 30);
+            ?? config('booking.default_duration_minutes', 30);
 
-        // Prioridad: parámetro > servicio > .env > fallback 15
+        // Prioridad: parámetro > servicio > config > fallback 30
         $interval = $slotInterval
             ?? $service?->slot_interval_minutes
-            ?? (int) env('BOOKING_SLOT_INTERVAL_MINUTES', 15);
+            ?? config('booking.slot_interval_minutes', 30);
 
         // ── 2. Rango del día ───────────────────────────────────────
+        $location = Location::findOrFail($locationId);
         $date     = Carbon::parse($startDate);
-        $dayStart = $date->copy()->setTime(9, 0);
-        $dayEnd   = $date->copy()->setTime(19, 0);
+        $dayStart = $date->copy()->setTimeFromTimeString($location->opening_time ?? '09:00:00');
+        $dayEnd   = $date->copy()->setTimeFromTimeString($location->closing_time ?? '19:00:00');
 
         // ── 3. Reservas activas del día ────────────────────────────
         $existingBookings = Booking::with('status')

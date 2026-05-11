@@ -14,7 +14,7 @@ class CheckUserRole
         $user = $request->user();
 
         if (! $user) {
-            return response()->json(['error' => 'forbidden', 'detail' => 'Authentication required.'], 403);
+            return response()->json(['error' => 'unauthenticated', 'detail' => 'Authentication required.'], 401);
         }
 
         $allowed = array_map(fn(string $r) => UserRole::from($r), $roles);
