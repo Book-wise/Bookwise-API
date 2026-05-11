@@ -1,11 +1,16 @@
 # Kinesilk API
 
+![Bookwise Logo](assets/images/Bookwise%20logo.png)
+
 ![Laravel](https://img.shields.io/badge/Laravel-11-FF2D20?logo=laravel&logoColor=white)
 ![PHP](https://img.shields.io/badge/PHP-8.2-777BB4?logo=php&logoColor=white)
 ![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)
-![Sanctum](https://img.shields.io/badge/Auth-Sanctum-FF2D20)
-
-![Bookwise Logo](assets/images/Bookwise%20logo.png)
+![Sanctum](https://img.shields.io/badge/Sanctum-Auth-FF2D20?logo=laravel&logoColor=white)
+![Composer](https://img.shields.io/badge/Composer-2-885630?logo=composer&logoColor=white)
+![WooCommerce](https://img.shields.io/badge/WooCommerce-Webhooks-7F54B3?logo=woocommerce&logoColor=white)
+![Angular](https://img.shields.io/badge/Angular-Consumer-DD0031?logo=angular&logoColor=white)
+![WordPress](https://img.shields.io/badge/WordPress-Bridge-21759B?logo=wordpress&logoColor=white)
+![REST API](https://img.shields.io/badge/REST-API-009688?logo=fastapi&logoColor=white)
 
 [🇺🇸 English](#english) &nbsp;|&nbsp; [🇨🇱 Español](#español)
 
