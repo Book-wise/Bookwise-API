@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Location extends Model
@@ -10,16 +11,16 @@ class Location extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'name', 'address', 'city', 'timezone', 'active'
+        'name', 'address', 'city', 'timezone', 'active', 'opening_time', 'closing_time'
     ];
 
     protected $casts = [
         'active' => 'boolean',
     ];
 
-    public function providers()
+    public function providers(): HasMany
     {
-        return $this->belongsToMany(Provider::class);
+        return $this->hasMany(Provider::class);
     }
 
     public function bookings()

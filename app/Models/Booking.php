@@ -60,6 +60,11 @@ class Booking extends Model
         return $this->hasOne(Sale::class);
     }
 
+    public function packSession()
+    {
+        return $this->hasOne(PackSession::class);
+    }
+
     // ── Scopes ─────────────────────────────────────────────────────
 
     public function scopeActive($query)
@@ -67,6 +72,24 @@ class Booking extends Model
         return $query->whereHas('status', fn($q) =>
             $q->where('is_cancellation', false)
         );
+    }
+
+    /**
+     * Scope to find bookings that overlap with a given time range.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param \Carbon\Carbon $startTime
+     * @param \Carbon\Carbon $endTime
+     * @param int|null $excludeId Booking ID to exclude from the search
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeOverlapping($query, $startTime, $endTime, $excludeId = null)
+    {
+        return $query->where(function ($q) use ($startTime, $endTime, $excludeId) {
+                $q->where('start_time', '<', $endTime)
+                  ->where('end_time', '>', $startTime);
+            })
+            ->when($excludeId, fn($q) => $q->where('id', '!=', $excludeId));
     }
 
     // ── Accessors ──────────────────────────────────────────────────

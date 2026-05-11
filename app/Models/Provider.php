@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Provider extends Model
@@ -10,16 +12,21 @@ class Provider extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'first_name', 'last_name', 'email', 'phone', 'active'
+        'user_id', 'first_name', 'last_name', 'email', 'phone', 'location_id', 'active'
     ];
 
     protected $casts = [
         'active' => 'boolean',
     ];
 
-    public function locations()
+    public function user(): HasOne
     {
-        return $this->belongsToMany(Location::class);
+        return $this->hasOne(User::class);
+    }
+
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Location::class);
     }
 
     public function services()
