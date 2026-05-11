@@ -28,7 +28,7 @@ Kinesilk runs multiple kinesiology clinics with independent providers per locati
 2. **Session packs tied to bookings** — a client buys 5 sessions on WooCommerce; the API automatically deducts each session when the appointment is attended.
 3. **Bidirectional WooCommerce sync** — the e-commerce confirms bookings, records payments, and syncs clients without manual intervention.
 
-This API is the core that connects those three worlds. It does not depend on any scheduling SaaS (AgendaPro was a design reference, not a provider).
+This API is the core that connects those three worlds.
 
 ### Why Laravel?
 
@@ -125,7 +125,7 @@ Kinesilk opera múltiples centros kinesiológicos con profesionales independient
 2. **Packs de sesiones vinculados a reservas** — un cliente compra 5 sesiones en WooCommerce y la API descuenta automáticamente cada sesión al atenderse.
 3. **Sincronización bidireccional con WooCommerce** — el e-commerce confirma reservas, registra pagos y sincroniza clientes sin intervención manual.
 
-Esta API es el núcleo que conecta esos tres mundos. No depende de ningún SaaS de agendamiento (AgendaPro fue referencia de diseño, no proveedor).
+Esta API es el núcleo que conecta esos tres mundos.
 
 ### Por qué Laravel
 
