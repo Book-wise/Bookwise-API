@@ -58,7 +58,7 @@ class BookingController extends Controller
             'start_time'       => ['required', 'date'],
             'end_time'         => ['nullable', 'date', 'after:start_time'],
             'service_id'       => ['required', 'integer', 'exists:services,id'],
-            'provider_id'      => ['nullable', 'integer', 'exists:providers,id'],
+            'provider_id'      => ['required', 'integer', 'exists:providers,id'],
             'client_id'        => ['required', 'integer', 'exists:clients,id'],
             'location_id'      => ['required', 'integer', 'exists:locations,id'],
             'status_id'        => ['required', 'integer', 'exists:booking_statuses,id'],
@@ -68,13 +68,22 @@ class BookingController extends Controller
             'wc_order_id'      => ['nullable', 'integer'],
         ]);
 
-        $service   = Service::findOrFail($validated['service_id']);
+        $service  = Service::findOrFail($validated['service_id']);
+        $provider = \App\Models\Provider::findOrFail($validated['provider_id']);
+
+        if ((int) $provider->location_id !== (int) $validated['location_id']) {
+            return response()->json([
+                'error'  => 'provider_location_mismatch',
+                'detail' => 'El profesional no pertenece a la ubicación seleccionada.',
+            ], 422);
+        }
+
         $startTime = Carbon::parse($validated['start_time']);
 
-        // Duración efectiva — CHG-001
+        // Duración efectiva
         $effectiveDuration = $validated['duration_minutes']
             ?? $service->duration_minutes
-            ?? (int) env('BOOKING_DEFAULT_DURATION_MINUTES', 30);
+            ?? config('booking.default_duration_minutes', 30);
 
         $endTime = isset($validated['end_time'])
             ? Carbon::parse($validated['end_time'])
