@@ -23,9 +23,8 @@ class BookingController extends Controller
             // Provider filter: only show bookings for their locations
             ->when($user?->role?->value === 'provider', function ($query) use ($user) {
                 $provider = $user->provider;
-                if ($provider) {
-                    $locationIds = $provider->locations->pluck('id')->toArray();
-                    $query->whereIn('location_id', $locationIds);
+                if ($provider?->location_id) {
+                    $query->where('location_id', $provider->location_id);
                 }
             })
             ->when($request->client_id,   fn($q) => $q->where('client_id',   $request->client_id))
