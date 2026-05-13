@@ -68,8 +68,16 @@ class BookingController extends Controller
             'wc_order_id'      => ['nullable', 'integer'],
         ]);
 
+        $user     = $request->user();
         $service  = Service::findOrFail($validated['service_id']);
         $provider = \App\Models\Provider::findOrFail($validated['provider_id']);
+
+        if ($user->isProvider() && (int) $user->provider_id !== (int) $validated['provider_id']) {
+            return response()->json([
+                'error'  => 'forbidden',
+                'detail' => 'Solo podés crear reservas para tu propio perfil de profesional.',
+            ], 403);
+        }
 
         if ((int) $provider->location_id !== (int) $validated['location_id']) {
             return response()->json([

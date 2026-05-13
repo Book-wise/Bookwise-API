@@ -31,7 +31,15 @@ class BlockedSlotController extends Controller
             'repeat.until'    => ['required_if:repeat.end_type,until', 'date', 'after:start_time'],
         ]);
 
+        $user     = $request->user();
         $provider = \App\Models\Provider::findOrFail($data['provider_id']);
+
+        if ($user->isProvider() && (int) $user->provider_id !== (int) $data['provider_id']) {
+            return response()->json([
+                'error'  => 'forbidden',
+                'detail' => 'Solo podés crear bloqueos para tu propio perfil de profesional.',
+            ], 403);
+        }
 
         if ((int) $provider->location_id !== (int) $data['location_id']) {
             return response()->json([
