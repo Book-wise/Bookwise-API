@@ -96,8 +96,9 @@ class BookingController extends Controller
             ? Carbon::parse($validated['end_time'])
             : $startTime->copy()->addMinutes($effectiveDuration);
 
-        // Check for booking overlaps (location or client)
+        // Check for booking overlaps (provider, location, or client)
         $conflict = $this->checkBookingOverlap(
+            $validated['provider_id'],
             $validated['location_id'],
             $validated['client_id'],
             $startTime,
@@ -105,9 +106,11 @@ class BookingController extends Controller
         );
 
         if ($conflict) {
-            $conflictType = $conflict->location_id === (int) $validated['location_id']
-                ? 'Location overlap with existing booking'
-                : 'Client overlap with existing booking';
+            $conflictType = match (true) {
+                $conflict->provider_id === (int) $validated['provider_id'] => 'Provider overlap with existing booking',
+                $conflict->location_id === (int) $validated['location_id'] => 'Location overlap with existing booking',
+                default                                                     => 'Client overlap with existing booking',
+            };
 
             return response()->json([
                 'error'       => 'conflict',
@@ -146,9 +149,10 @@ class BookingController extends Controller
             'provider_id' => ['sometimes', 'nullable', 'integer', 'exists:providers,id'],
         ]);
 
-        // Check for booking overlaps if time, location, or client is being changed
+        // Check for booking overlaps if time, provider, location, or client is being changed
         if (isset($validated['start_time']) || isset($validated['end_time'])
-            || isset($validated['location_id']) || isset($validated['client_id'])) {
+            || isset($validated['provider_id']) || isset($validated['location_id'])
+            || isset($validated['client_id'])) {
 
             $startTime = isset($validated['start_time'])
                 ? Carbon::parse($validated['start_time'])
@@ -158,15 +162,12 @@ class BookingController extends Controller
                 ? Carbon::parse($validated['end_time'])
                 : ($booking->end_time ?? $startTime->copy()->addMinutes($booking->effective_duration_minutes));
 
-            $locationId = isset($validated['location_id'])
-                ? $validated['location_id']
-                : $booking->location_id;
-
-            $clientId = isset($validated['client_id'])
-                ? $validated['client_id']
-                : $booking->client_id;
+            $providerId = $validated['provider_id'] ?? $booking->provider_id;
+            $locationId = $validated['location_id'] ?? $booking->location_id;
+            $clientId   = $validated['client_id']   ?? $booking->client_id;
 
             $conflict = $this->checkBookingOverlap(
+                $providerId,
                 $locationId,
                 $clientId,
                 $startTime,
@@ -175,9 +176,11 @@ class BookingController extends Controller
             );
 
             if ($conflict) {
-                $conflictType = $conflict->location_id === $locationId
-                    ? 'Location overlap with existing booking'
-                    : 'Client overlap with existing booking';
+                $conflictType = match (true) {
+                    $conflict->provider_id === (int) $providerId => 'Provider overlap with existing booking',
+                    $conflict->location_id === (int) $locationId => 'Location overlap with existing booking',
+                    default                                       => 'Client overlap with existing booking',
+                };
 
                 return response()->json([
                     'error'       => 'conflict',
@@ -226,39 +229,21 @@ class BookingController extends Controller
     }
 
     // ── Private: Check for booking overlaps ───────────────────────────
-    /**
-     * Check if there are any overlapping bookings (location or client).
-     *
-     * @param int $locationId
-     * @param int $clientId
-     * @param Carbon $startTime
-     * @param Carbon $endTime
-     * @param int|null $excludeBookingId Booking ID to exclude from the search
-     * @return Booking|null The conflicting booking, or null if no conflict
-     */
     private function checkBookingOverlap(
+        int $providerId,
         int $locationId,
         int $clientId,
         Carbon $startTime,
         Carbon $endTime,
         ?int $excludeBookingId = null
     ): ?Booking {
-        // Check location overlap
-        $locationConflict = Booking::where('location_id', $locationId)
+        $base = fn($column, $value) => Booking::where($column, $value)
             ->active()
             ->overlapping($startTime, $endTime, $excludeBookingId)
             ->first();
 
-        if ($locationConflict) {
-            return $locationConflict;
-        }
-
-        // Check client overlap
-        $clientConflict = Booking::where('client_id', $clientId)
-            ->active()
-            ->overlapping($startTime, $endTime, $excludeBookingId)
-            ->first();
-
-        return $clientConflict;
+        return $base('provider_id', $providerId)
+            ?? $base('location_id', $locationId)
+            ?? $base('client_id', $clientId);
     }
 }
