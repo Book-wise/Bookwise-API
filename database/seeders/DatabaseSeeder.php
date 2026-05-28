@@ -18,5 +18,6 @@ class DatabaseSeeder extends Seeder
         $this->call(TestDataSeeder::class);
         $this->call(ThisWeekBookingsSeeder::class);
         $this->call(JuneBookingsSeeder::class);
+        $this->call(BookingNotesSeeder::class);
     }
 }
