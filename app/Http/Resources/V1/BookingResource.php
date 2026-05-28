@@ -39,6 +39,7 @@ class BookingResource extends JsonResource
                     'session_number'  => $ps->session_number,
                     'total_sessions'  => $ps->clientPack?->total_sessions,
                     'client_pack_id'  => $ps->client_pack_id,
+                    'service_pack_id' => $ps->clientPack?->service_pack_id,
                     'status'          => $ps->status,
                 ];
             }),

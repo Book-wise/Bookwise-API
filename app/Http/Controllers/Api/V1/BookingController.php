@@ -54,21 +54,49 @@ class BookingController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'start_time'       => ['required', 'date'],
-            'end_time'         => ['nullable', 'date', 'after:start_time'],
-            'service_id'       => ['required', 'integer', 'exists:services,id'],
-            'provider_id'      => ['required', 'integer', 'exists:providers,id'],
-            'client_id'        => ['required', 'integer', 'exists:clients,id'],
-            'location_id'      => ['required', 'integer', 'exists:locations,id'],
-            'status_id'        => ['required', 'integer', 'exists:booking_statuses,id'],
-            'price'            => ['nullable', 'numeric', 'min:0'],
-            'notes'            => ['nullable', 'string', 'max:1000'],
-            'duration_minutes' => ['nullable', 'integer', 'min:15', 'max:480'],
-            'wc_order_id'      => ['nullable', 'integer'],
+            'start_time'      => ['required', 'date'],
+            'end_time'        => ['nullable', 'date', 'after:start_time'],
+            'service_id'      => ['nullable', 'integer', 'exists:services,id'],
+            'service_pack_id' => ['nullable', 'integer', 'exists:service_packs,id'],
+            'provider_id'     => ['required', 'integer', 'exists:providers,id'],
+            'client_id'       => ['required', 'integer', 'exists:clients,id'],
+            'location_id'     => ['required', 'integer', 'exists:locations,id'],
+            'status_id'       => ['required', 'integer', 'exists:booking_statuses,id'],
+            'price'           => ['nullable', 'numeric', 'min:0'],
+            'notes'           => ['nullable', 'string', 'max:1000'],
+            'duration_minutes'=> ['nullable', 'integer', 'min:15', 'max:480'],
+            'wc_order_id'     => ['nullable', 'integer'],
         ]);
 
+        // Exactly one of service_id / service_pack_id is required
+        $hasService = filled($validated['service_id'] ?? null);
+        $hasPack    = filled($validated['service_pack_id'] ?? null);
+
+        if ($hasService && $hasPack) {
+            return response()->json([
+                'error'  => 'invalid_input',
+                'detail' => 'Provide either service_id or service_pack_id, not both.',
+            ], 422);
+        }
+
+        if (! $hasService && ! $hasPack) {
+            return response()->json([
+                'error'  => 'invalid_input',
+                'detail' => 'Either service_id or service_pack_id is required.',
+            ], 422);
+        }
+
+        // Resolve service — from pack or directly
+        if ($hasPack) {
+            $servicePack = \App\Models\ServicePack::with('service')->findOrFail($validated['service_pack_id']);
+            $validated['service_id'] = $servicePack->service_id;
+            $service = $servicePack->service;
+            unset($validated['service_pack_id']);
+        } else {
+            $service = Service::findOrFail($validated['service_id']);
+        }
+
         $user     = $request->user();
-        $service  = Service::findOrFail($validated['service_id']);
         $provider = \App\Models\Provider::findOrFail($validated['provider_id']);
 
         if ($user->isProvider() && (int) $user->provider_id !== (int) $validated['provider_id']) {
@@ -141,18 +169,34 @@ class BookingController extends Controller
         $booking = Booking::findOrFail($id);
 
         $validated = $request->validate([
-            'start_time'  => ['sometimes', 'date'],
-            'end_time'    => ['sometimes', 'date', 'after:start_time'],
-            'status_id'   => ['sometimes', 'integer', 'exists:booking_statuses,id'],
-            'price'       => ['sometimes', 'numeric', 'min:0'],
-            'notes'       => ['sometimes', 'nullable', 'string', 'max:1000'],
-            'provider_id' => ['sometimes', 'nullable', 'integer', 'exists:providers,id'],
+            'start_time'      => ['sometimes', 'date'],
+            'end_time'        => ['sometimes', 'date', 'after:start_time'],
+            'status_id'       => ['sometimes', 'integer', 'exists:booking_statuses,id'],
+            'price'           => ['sometimes', 'numeric', 'min:0'],
+            'notes'           => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'provider_id'     => ['sometimes', 'integer', 'exists:providers,id'],
+            'service_id'      => ['sometimes', 'integer', 'exists:services,id'],
+            'service_pack_id' => ['sometimes', 'integer', 'exists:service_packs,id'],
         ]);
 
-        // Check for booking overlaps if time, provider, location, or client is being changed
+        // Mutual exclusivity for service changes
+        if (isset($validated['service_id']) && isset($validated['service_pack_id'])) {
+            return response()->json([
+                'error'  => 'invalid_input',
+                'detail' => 'Provide either service_id or service_pack_id, not both.',
+            ], 422);
+        }
+
+        // Resolve service_id from pack
+        if (isset($validated['service_pack_id'])) {
+            $servicePack = \App\Models\ServicePack::findOrFail($validated['service_pack_id']);
+            $validated['service_id'] = $servicePack->service_id;
+            unset($validated['service_pack_id']);
+        }
+
+        // Check for booking overlaps if time or provider is being changed
         if (isset($validated['start_time']) || isset($validated['end_time'])
-            || isset($validated['provider_id']) || isset($validated['location_id'])
-            || isset($validated['client_id'])) {
+            || isset($validated['provider_id'])) {
 
             $startTime = isset($validated['start_time'])
                 ? Carbon::parse($validated['start_time'])
