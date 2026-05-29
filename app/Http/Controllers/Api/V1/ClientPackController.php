@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\V1\PackSessionResource;
 use App\Models\ClientPack;
 use App\Models\PackSession;
 use Illuminate\Http\Request;
@@ -22,18 +23,42 @@ class ClientPackController extends Controller
 
     public function show(int $id, Request $request): JsonResponse
     {
-        $pack = ClientPack::with(['servicePack.service', 'sessions.booking', 'client'])
+        $pack = ClientPack::with([
+                'servicePack.service',
+                'sessions' => fn($q) => $q->orderBy('session_number'),
+                'sessions.clientPack.servicePack.service',
+                'sessions.booking.provider',
+                'sessions.booking.location',
+                'sessions.booking.status',
+                'client',
+            ])
             ->where('client_id', $request->user()->id)
             ->findOrFail($id);
 
         return response()->json([
-            'data' => $pack,
+            'data' => [
+                'id'             => $pack->id,
+                'client_id'      => $pack->client_id,
+                'service_pack'   => [
+                    'id'             => $pack->servicePack->id,
+                    'name'           => $pack->servicePack->name,
+                    'total_sessions' => $pack->servicePack->total_sessions,
+                    'price'          => $pack->servicePack->price,
+                    'service'        => [
+                        'id'    => $pack->servicePack->service->id,
+                        'name'  => $pack->servicePack->service->name,
+                        'price' => $pack->servicePack->service->price,
+                    ],
+                ],
+                'sessions'       => PackSessionResource::collection($pack->sessions),
+            ],
             'meta' => [
-                'total_sessions'     => $pack->total_sessions,
-                'used_sessions'      => $pack->used_sessions,
-                'remaining_sessions' => $pack->remaining_sessions,
-                'status'             => $pack->status,
-            ]
+                'total_sessions'           => $pack->total_sessions,
+                'used_sessions'            => $pack->used_sessions,
+                'remaining_sessions'       => $pack->remaining_sessions,
+                'status'                   => $pack->status,
+                'default_price_per_session' => (float) ($pack->servicePack->service->price ?? 0),
+            ],
         ]);
     }
 

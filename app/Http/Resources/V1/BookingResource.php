@@ -35,12 +35,21 @@ class BookingResource extends JsonResource
             'pack_session'               => $this->whenLoaded('packSession', function () {
                 $ps = $this->packSession;
                 if (! $ps) return null;
+                $cp = $ps->clientPack;
                 return [
                     'session_number'  => $ps->session_number,
-                    'total_sessions'  => $ps->clientPack?->total_sessions,
+                    'total_sessions'  => $cp?->total_sessions,
                     'client_pack_id'  => $ps->client_pack_id,
-                    'service_pack_id' => $ps->clientPack?->service_pack_id,
+                    'service_pack_id' => $cp?->service_pack_id,
+                    'effective_price' => $ps->effective_price,
+                    'price'           => $ps->price,
+                    'notes'           => $ps->notes,
                     'status'          => $ps->status,
+                    'all_sessions'    => $cp?->relationLoaded('sessions')
+                        ? PackSessionResource::collection(
+                            $cp->sessions->sortBy('session_number')->values()
+                          )
+                        : [],
                 ];
             }),
         ];

@@ -44,8 +44,16 @@ class BookingController extends Controller
     // ── GET /v1/bookings/{id} ──────────────────────────────────────
     public function show(int $id): JsonResponse
     {
-        $booking = Booking::with(['client', 'service', 'provider', 'location', 'status', 'statusHistory.status', 'sale', 'packSession.clientPack'])
-            ->findOrFail($id);
+        $booking = Booking::with([
+                'client', 'service', 'provider', 'location', 'status',
+                'statusHistory.status', 'sale',
+                'packSession.clientPack.servicePack.service',
+                'packSession.clientPack.sessions' => fn($q) => $q->orderBy('session_number'),
+                'packSession.clientPack.sessions.clientPack.servicePack.service',
+                'packSession.clientPack.sessions.booking.provider',
+                'packSession.clientPack.sessions.booking.location',
+                'packSession.clientPack.sessions.booking.status',
+            ])->findOrFail($id);
 
         return response()->json(['data' => new BookingResource($booking)]);
     }
