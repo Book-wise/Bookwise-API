@@ -75,14 +75,25 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
         ->middleware('scope:providers:read');
 
     // Sales
-    Route::get('/sales',      [SaleController::class, 'index'])
-        ->middleware('scope:sales:read');
-    Route::get('/sales/{id}', [SaleController::class, 'show'])
-        ->middleware('scope:sales:read');
+    Route::get('/sales',      [SaleController::class, 'index'])->middleware('scope:sales:read');
+    Route::post('/sales',     [SaleController::class, 'store'])->middleware(['scope:sales:read', 'role:admin']);
+    Route::get('/sales/{id}', [SaleController::class, 'show'])->middleware('scope:sales:read');
+    Route::patch('/sales/{id}', [SaleController::class, 'update'])->middleware(['scope:sales:read', 'role:admin']);
+
+    Route::get('/sales/{id}/transactions',
+        [SaleController::class, 'listTransactions'])->middleware('scope:sales:read');
+    Route::post('/sales/{id}/transactions',
+        [SaleController::class, 'registerTransaction'])->middleware(['scope:sales:read', 'role:admin']);
+    Route::delete('/sales/{id}/transactions/{transactionId}',
+        [SaleController::class, 'destroyTransaction'])->middleware(['scope:sales:read', 'role:admin']);
 
     // Custom attributes
     Route::get('/custom_attributes', [CustomAttributeController::class, 'index'])
         ->middleware('scope:clients:read');
+
+    // Pack Sessions
+    Route::patch('/pack-sessions/{id}', [\App\Http\Controllers\Api\V1\PackSessionController::class, 'update'])
+        ->middleware(['scope:bookings:write', 'role:admin']);
 
     // Client Packs
     Route::get('/client-packs',            [ClientPackController::class, 'index'])
