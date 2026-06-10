@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\WebhookController;
 use App\Http\Controllers\Api\V1\BlockedSlotController;
 use App\Http\Controllers\Api\V1\ServicePackController;
 use App\Http\Controllers\Api\V1\ClientPackController;
+use App\Http\Controllers\Api\V1\AgentController;
 
 // Webhook WooCommerce — HMAC, sin Sanctum
 Route::post('/v1/webhooks/woocommerce', [WebhookController::class, 'handle'])
@@ -117,4 +118,8 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
 
     // Me
     Route::get('/me', [ClientController::class, 'me'])->middleware('scope:clients:read');
+
+    // Agente conversacional
+    Route::get('/agent/check-availability', [AgentController::class, 'checkAvailability'])
+        ->middleware('scope:bookings:read');
 });
