@@ -102,6 +102,7 @@ class TestDataSeeder extends Seeder
         DB::table('users')->insert([
             ['name' => 'Admin Kinesilk',     'email' => 'admin@kinesilk.cl',     'password' => Hash::make('password'), 'role' => 'admin',    'provider_id' => null,    'created_at' => now(), 'updated_at' => now()],
             ['name' => 'WooCommerce Bridge', 'email' => 'wc@kinesilk.cl',        'password' => Hash::make('wc-bridge-2026'), 'role' => 'woocommerce', 'provider_id' => null, 'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Conversational Agent', 'email' => 'agent@kinesilk.cl',   'password' => Hash::make('agent-2026'), 'role' => 'agent', 'provider_id' => null, 'created_at' => now(), 'updated_at' => now()],
             // Centro
             ['name' => 'María González',     'email' => 'maria@kinesilk.cl',     'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pMaria,  'created_at' => now(), 'updated_at' => now()],
             ['name' => 'Carmen Lira',        'email' => 'carmen@kinesilk.cl',    'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pCarmen, 'created_at' => now(), 'updated_at' => now()],

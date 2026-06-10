@@ -16,6 +16,7 @@ class ClientResource extends JsonResource
             'email'          => $this->email,
             'phone'          => $this->phone,
             'rut'            => $this->rut,
+            'rut_missing'    => empty($this->rut),
             'gender'         => $this->gender,
             'wc_customer_id' => $this->wc_customer_id,
             'address'        => $this->address,
