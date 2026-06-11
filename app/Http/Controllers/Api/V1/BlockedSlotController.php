@@ -44,7 +44,7 @@ class BlockedSlotController extends Controller
             if ($user->isProvider()) {
                 return response()->json([
                     'error' => 'forbidden',
-                    'detail' => 'Solo un administrador puede bloquear horarios para toda una ubicación.',
+                    'detail' => 'Only an administrator can block time slots for an entire location.',
                 ], 403);
             }
 
@@ -80,14 +80,14 @@ class BlockedSlotController extends Controller
         if ($user->isProvider() && (int) $user->provider_id !== (int) $data['provider_id']) {
             return response()->json([
                 'error' => 'forbidden',
-                'detail' => 'Solo podés crear bloqueos para tu propio perfil de profesional.',
+                'detail' => 'You can only create blocks for your own provider profile.',
             ], 403);
         }
 
         if ((int) $provider->location_id !== (int) $data['location_id']) {
             return response()->json([
                 'error' => 'provider_location_mismatch',
-                'detail' => 'El profesional no pertenece a la ubicación seleccionada.',
+                'detail' => 'The provider does not belong to the selected location.',
             ], 422);
         }
 
@@ -95,8 +95,8 @@ class BlockedSlotController extends Controller
 
         if ($result['status'] === 'conflict') {
             $detail = $result['conflict']['type'] === 'booking'
-                ? 'El profesional tiene una reserva en este horario.'
-                : 'Horario ya bloqueado para este profesional.';
+                ? 'The provider has a booking at this time.'
+                : 'This time slot is already blocked for this provider.';
 
             return response()->json([
                 'error' => 'slot_collision',
@@ -125,46 +125,10 @@ class BlockedSlotController extends Controller
 
         $slots = collect();
         foreach ($occurrences as [$occStart, $occEnd]) {
-            $blockedCollision = BlockedSlot::where('provider_id', $provider->id)
-                ->where(function ($q) use ($occStart, $occEnd) {
-                    $q->where('start_time', '<', $occEnd)
-                        ->where('end_time', '>', $occStart);
-                })
-                ->first();
+            $conflict = $this->findCollision($provider->id, $occStart, $occEnd);
 
-            if ($blockedCollision) {
-                return [
-                    'status' => 'conflict',
-                    'conflict' => [
-                        'id' => $blockedCollision->id,
-                        'start_time' => $blockedCollision->start_time->toIso8601String(),
-                        'end_time' => $blockedCollision->end_time->toIso8601String(),
-                        'reason' => $blockedCollision->reason,
-                        'type' => 'blocked_slot',
-                    ],
-                ];
-            }
-
-            $bookingCollision = Booking::where('provider_id', $provider->id)
-                ->active()
-                ->where(function ($q) use ($occStart, $occEnd) {
-                    $q->where('start_time', '<', $occEnd)
-                        ->where('end_time', '>', $occStart);
-                })
-                ->first();
-
-            if ($bookingCollision) {
-                return [
-                    'status' => 'conflict',
-                    'conflict' => [
-                        'id' => $bookingCollision->id,
-                        'start_time' => $bookingCollision->start_time->toIso8601String(),
-                        'end_time' => $bookingCollision->end_time->toIso8601String(),
-                        'service' => $bookingCollision->service?->name,
-                        'client' => $bookingCollision->client?->first_name.' '.$bookingCollision->client?->last_name,
-                        'type' => 'booking',
-                    ],
-                ];
+            if ($conflict) {
+                return ['status' => 'conflict', 'conflict' => $conflict];
             }
 
             $slots->push(BlockedSlot::create([
@@ -178,6 +142,206 @@ class BlockedSlotController extends Controller
         }
 
         return ['status' => 'created', 'slots' => $slots];
+    }
+
+    /**
+     * Checks for blocked-slot or active booking collisions for a provider within a time range.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function findCollision(int $providerId, Carbon $start, Carbon $end, ?int $excludeBlockedSlotId = null): ?array
+    {
+        $blockedCollision = BlockedSlot::where('provider_id', $providerId)
+            ->when($excludeBlockedSlotId, fn ($q) => $q->where('id', '!=', $excludeBlockedSlotId))
+            ->where(function ($q) use ($start, $end) {
+                $q->where('start_time', '<', $end)
+                    ->where('end_time', '>', $start);
+            })
+            ->first();
+
+        if ($blockedCollision) {
+            return [
+                'id' => $blockedCollision->id,
+                'start_time' => $blockedCollision->start_time->toIso8601String(),
+                'end_time' => $blockedCollision->end_time->toIso8601String(),
+                'reason' => $blockedCollision->reason,
+                'type' => 'blocked_slot',
+            ];
+        }
+
+        $bookingCollision = Booking::where('provider_id', $providerId)
+            ->active()
+            ->where(function ($q) use ($start, $end) {
+                $q->where('start_time', '<', $end)
+                    ->where('end_time', '>', $start);
+            })
+            ->first();
+
+        if ($bookingCollision) {
+            return [
+                'id' => $bookingCollision->id,
+                'start_time' => $bookingCollision->start_time->toIso8601String(),
+                'end_time' => $bookingCollision->end_time->toIso8601String(),
+                'service' => $bookingCollision->service?->name,
+                'client' => $bookingCollision->client?->first_name.' '.$bookingCollision->client?->last_name,
+                'type' => 'booking',
+            ];
+        }
+
+        return null;
+    }
+
+    // ── PATCH /v1/blocked-slots/:id ─────────────────────────────────
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $blockedSlot = BlockedSlot::findOrFail($id);
+
+        $data = $request->validate([
+            'start_time' => ['sometimes', 'date'],
+            'end_time' => ['sometimes', 'date'],
+            'reason' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'scope' => ['nullable', 'in:single,all'],
+            'provider_id' => ['sometimes', 'nullable', 'integer', 'exists:providers,id'],
+            'location_id' => ['sometimes', 'nullable', 'integer', 'exists:locations,id'],
+        ]);
+
+        $start = isset($data['start_time']) ? Carbon::parse($data['start_time']) : $blockedSlot->start_time->copy();
+        $end = isset($data['end_time']) ? Carbon::parse($data['end_time']) : $blockedSlot->end_time->copy();
+
+        if ($end->lte($start)) {
+            return response()->json([
+                'error' => 'validation_error',
+                'detail' => 'end_time must be after start_time.',
+            ], 422);
+        }
+
+        $locationId = $data['location_id'] ?? $blockedSlot->location_id;
+        $reason = array_key_exists('reason', $data) ? $data['reason'] : $blockedSlot->reason;
+        $user = $request->user();
+
+        if (($data['scope'] ?? 'single') === 'all') {
+            if ($user->isProvider()) {
+                return response()->json([
+                    'error' => 'forbidden',
+                    'detail' => 'Only an administrator can block time slots for an entire location.',
+                ], 403);
+            }
+
+            return $this->updateForLocation($blockedSlot, $start, $end, $reason, $locationId);
+        }
+
+        $providerId = $data['provider_id'] ?? $blockedSlot->provider_id;
+        $provider = Provider::findOrFail($providerId);
+
+        if ($user->isProvider() && (int) $user->provider_id !== (int) $providerId) {
+            return response()->json([
+                'error' => 'forbidden',
+                'detail' => 'You can only edit blocks for your own provider profile.',
+            ], 403);
+        }
+
+        if ((int) $provider->location_id !== (int) $locationId) {
+            return response()->json([
+                'error' => 'provider_location_mismatch',
+                'detail' => 'The provider does not belong to the selected location.',
+            ], 422);
+        }
+
+        $conflict = $this->findCollision($providerId, $start, $end, $blockedSlot->id);
+
+        if ($conflict) {
+            $detail = $conflict['type'] === 'booking'
+                ? 'The provider has a booking at this time.'
+                : 'This time slot is already blocked for this provider.';
+
+            return response()->json([
+                'error' => 'slot_collision',
+                'detail' => $detail,
+                'conflicts_with' => $conflict,
+            ], 409);
+        }
+
+        $blockedSlot->update([
+            'start_time' => $start,
+            'end_time' => $end,
+            'reason' => $reason,
+            'provider_id' => $providerId,
+            'location_id' => $locationId,
+        ]);
+
+        return response()->json(['data' => new BlockedSlotResource($blockedSlot)]);
+    }
+
+    /**
+     * Promotes a single-provider blocked slot to a location-wide block: updates the
+     * edited slot in place and creates matching blocks for every other active provider
+     * of the location that doesn't already have a conflict at this time.
+     */
+    private function updateForLocation(BlockedSlot $blockedSlot, Carbon $start, Carbon $end, ?string $reason, int $locationId): JsonResponse
+    {
+        $providerId = $blockedSlot->provider_id;
+
+        if ($providerId) {
+            $conflict = $this->findCollision($providerId, $start, $end, $blockedSlot->id);
+
+            if ($conflict) {
+                $detail = $conflict['type'] === 'booking'
+                    ? 'The provider has a booking at this time.'
+                    : 'This time slot is already blocked for this provider.';
+
+                return response()->json([
+                    'error' => 'slot_collision',
+                    'detail' => $detail,
+                    'conflicts_with' => $conflict,
+                ], 409);
+            }
+        }
+
+        $blockedSlot->update([
+            'start_time' => $start,
+            'end_time' => $end,
+            'reason' => $reason,
+            'location_id' => $locationId,
+        ]);
+
+        $created = collect();
+        $conflicts = [];
+
+        $providers = Provider::where('location_id', $locationId)
+            ->where('active', true)
+            ->when($providerId, fn ($q) => $q->where('id', '!=', $providerId))
+            ->get();
+
+        foreach ($providers as $provider) {
+            $conflict = $this->findCollision($provider->id, $start, $end);
+
+            if ($conflict) {
+                $conflicts[] = [
+                    'provider' => [
+                        'id' => $provider->id,
+                        'first_name' => $provider->first_name,
+                        'last_name' => $provider->last_name,
+                    ],
+                    'conflict' => $conflict,
+                ];
+
+                continue;
+            }
+
+            $created->push(BlockedSlot::create([
+                'start_time' => $start,
+                'end_time' => $end,
+                'reason' => $reason,
+                'location_id' => $locationId,
+                'provider_id' => $provider->id,
+            ]));
+        }
+
+        return response()->json([
+            'data' => new BlockedSlotResource($blockedSlot),
+            'created' => BlockedSlotResource::collection($created),
+            'conflicts' => $conflicts,
+        ]);
     }
 
     // ── GET /v1/blocked-slots ──────────────────────────────────────
