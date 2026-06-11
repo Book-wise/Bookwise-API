@@ -227,6 +227,13 @@ class BlockedSlotController extends Controller
                 ], 403);
             }
 
+            if ($locationId === null) {
+                return response()->json([
+                    'error' => 'validation_error',
+                    'detail' => 'location_id is required to apply scope=all.',
+                ], 422);
+            }
+
             return $this->updateForLocation($blockedSlot, $start, $end, $reason, $locationId);
         }
 
