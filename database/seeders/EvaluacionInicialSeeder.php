@@ -14,29 +14,43 @@ class EvaluacionInicialSeeder extends Seeder
         $client = DB::table('clients')->where('email', 'laura@mail.com')->value('id');
         $statusId = DB::table('booking_statuses')->where('name', 'Reservado')->value('id') ?? 1;
 
-        // Servicio gratuito de evaluación inicial
-        $serviceId = DB::table('services')->insertGetId([
-            'name' => 'Consulta de Evaluación Inicial',
-            'duration_minutes' => 30,
-            'slot_interval_minutes' => 15,
-            'min_duration_minutes' => 30,
-            'max_duration_minutes' => 60,
-            'price' => 0,
-            'active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        // Servicio gratuito de evaluación inicial (idempotente: solo se crea una vez)
+        $serviceId = DB::table('services')->where('name', 'Consulta de Evaluación Inicial')->value('id');
 
-        // Asignar el servicio a los providers de Centro
-        $centroProviders = DB::table('providers')->where('location_id', $locCentro)->pluck('id');
-        foreach ($centroProviders as $providerId) {
-            DB::table('provider_service')->insert([
-                'provider_id' => $providerId,
-                'service_id' => $serviceId,
+        if (! $serviceId) {
+            $serviceId = DB::table('services')->insertGetId([
+                'name' => 'Consulta de Evaluación Inicial',
+                'duration_minutes' => 30,
+                'slot_interval_minutes' => 15,
+                'min_duration_minutes' => 30,
+                'max_duration_minutes' => 60,
+                'price' => 0,
+                'active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
+
+            // Asignar el servicio a los providers de Centro
+            $centroProviders = DB::table('providers')->where('location_id', $locCentro)->pluck('id');
+            foreach ($centroProviders as $providerId) {
+                DB::table('provider_service')->insert([
+                    'provider_id' => $providerId,
+                    'service_id' => $serviceId,
+                ]);
+            }
         }
 
-        // Reserva de evaluación para Laura — próximo lunes a las 08:30
+        // Reserva de evaluación para Laura — próximo lunes a las 08:30 (idempotente)
+        $bookingExists = DB::table('bookings')
+            ->where('client_id', $client)
+            ->where('service_id', $serviceId)
+            ->where('start_time', '2026-06-01 08:30:00')
+            ->exists();
+
+        if ($bookingExists) {
+            return;
+        }
+
         $bookingId = DB::table('bookings')->insertGetId([
             'client_id' => $client,
             'service_id' => $serviceId,
