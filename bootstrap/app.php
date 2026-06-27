@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Middleware\CheckOwnership;
+use App\Http\Middleware\CheckTokenScope;
+use App\Http\Middleware\CheckUserRole;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -13,9 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'scope' => \App\Http\Middleware\CheckTokenScope::class,
-            'role' => \App\Http\Middleware\CheckUserRole::class,
-            'ownership' => \App\Http\Middleware\CheckOwnership::class,
+            'scope' => CheckTokenScope::class,
+            'role' => CheckUserRole::class,
+            'ownership' => CheckOwnership::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

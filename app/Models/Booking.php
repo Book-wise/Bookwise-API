@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -13,13 +15,13 @@ class Booking extends Model
         'client_id', 'service_id', 'provider_id',
         'location_id', 'status_id', 'start_time',
         'end_time', 'custom_duration_minutes',
-        'price', 'notes', 'wc_order_id'
+        'price', 'notes', 'wc_order_id',
     ];
 
     protected $casts = [
-        'start_time'              => 'datetime',
-        'end_time'                => 'datetime',
-        'price'                   => 'decimal:2',
+        'start_time' => 'datetime',
+        'end_time' => 'datetime',
+        'price' => 'decimal:2',
         'custom_duration_minutes' => 'integer',
     ];
 
@@ -69,27 +71,26 @@ class Booking extends Model
 
     public function scopeActive($query)
     {
-        return $query->whereHas('status', fn($q) =>
-            $q->where('is_cancellation', false)
+        return $query->whereHas('status', fn ($q) => $q->where('is_cancellation', false)
         );
     }
 
     /**
      * Scope to find bookings that overlap with a given time range.
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param \Carbon\Carbon $startTime
-     * @param \Carbon\Carbon $endTime
-     * @param int|null $excludeId Booking ID to exclude from the search
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @param  Builder  $query
+     * @param  Carbon  $startTime
+     * @param  Carbon  $endTime
+     * @param  int|null  $excludeId  Booking ID to exclude from the search
+     * @return Builder
      */
     public function scopeOverlapping($query, $startTime, $endTime, $excludeId = null)
     {
-        return $query->where(function ($q) use ($startTime, $endTime, $excludeId) {
-                $q->where('start_time', '<', $endTime)
-                  ->where('end_time', '>', $startTime);
-            })
-            ->when($excludeId, fn($q) => $q->where('id', '!=', $excludeId));
+        return $query->where(function ($q) use ($startTime, $endTime) {
+            $q->where('start_time', '<', $endTime)
+                ->where('end_time', '>', $startTime);
+        })
+            ->when($excludeId, fn ($q) => $q->where('id', '!=', $excludeId));
     }
 
     // ── Accessors ──────────────────────────────────────────────────

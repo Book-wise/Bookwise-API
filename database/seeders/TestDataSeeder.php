@@ -11,29 +11,29 @@ class TestDataSeeder extends Seeder
     public function run(): void
     {
         // ── Locations ─────────────────────────────────────────────────
-        $locCentro      = DB::table('locations')->insertGetId(['name' => 'Kinesilk Centro',      'address' => 'Av. Providencia 1234',      'city' => 'Santiago', 'timezone' => 'America/Santiago', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $locLasCondes   = DB::table('locations')->insertGetId(['name' => 'Kinesilk Las Condes',  'address' => 'Av. Apoquindo 4500',        'city' => 'Santiago', 'timezone' => 'America/Santiago', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $locCentro = DB::table('locations')->insertGetId(['name' => 'Kinesilk Centro',      'address' => 'Av. Providencia 1234',      'city' => 'Santiago', 'timezone' => 'America/Santiago', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $locLasCondes = DB::table('locations')->insertGetId(['name' => 'Kinesilk Las Condes',  'address' => 'Av. Apoquindo 4500',        'city' => 'Santiago', 'timezone' => 'America/Santiago', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
         $locProvidencia = DB::table('locations')->insertGetId(['name' => 'Kinesilk Providencia', 'address' => 'Av. Pedro de Valdivia 210', 'city' => 'Santiago', 'timezone' => 'America/Santiago', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
 
         // ── Services ──────────────────────────────────────────────────
         $svcRelajante = DB::table('services')->insertGetId(['name' => 'Masaje Relajante',  'duration_minutes' => 60, 'slot_interval_minutes' => 15, 'min_duration_minutes' => 30, 'max_duration_minutes' => 120, 'price' => 35000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
         $svcDeportivo = DB::table('services')->insertGetId(['name' => 'Masaje Deportivo',  'duration_minutes' => 45, 'slot_interval_minutes' => 15, 'min_duration_minutes' => 30, 'max_duration_minutes' => 90,  'price' => 28000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $svcKinesio   = DB::table('services')->insertGetId(['name' => 'Kinesiología',      'duration_minutes' => 60, 'slot_interval_minutes' => 15, 'min_duration_minutes' => 45, 'max_duration_minutes' => 120, 'price' => 40000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $svcDrenaje   = DB::table('services')->insertGetId(['name' => 'Drenaje Linfático', 'duration_minutes' => 90, 'slot_interval_minutes' => 15, 'min_duration_minutes' => 60, 'max_duration_minutes' => 120, 'price' => 45000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $svcKinesio = DB::table('services')->insertGetId(['name' => 'Kinesiología',      'duration_minutes' => 60, 'slot_interval_minutes' => 15, 'min_duration_minutes' => 45, 'max_duration_minutes' => 120, 'price' => 40000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $svcDrenaje = DB::table('services')->insertGetId(['name' => 'Drenaje Linfático', 'duration_minutes' => 90, 'slot_interval_minutes' => 15, 'min_duration_minutes' => 60, 'max_duration_minutes' => 120, 'price' => 45000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
 
         // ── Providers ─────────────────────────────────────────────────
         // Centro: María, Carmen, Jorge
-        $pMaria  = DB::table('providers')->insertGetId(['first_name' => 'María',  'last_name' => 'González',   'email' => 'maria@kinesilk.cl',  'phone' => '+56912345001', 'location_id' => $locCentro,      'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $pMaria = DB::table('providers')->insertGetId(['first_name' => 'María',  'last_name' => 'González',   'email' => 'maria@kinesilk.cl',  'phone' => '+56912345001', 'location_id' => $locCentro,      'active' => true, 'created_at' => now(), 'updated_at' => now()]);
         $pCarmen = DB::table('providers')->insertGetId(['first_name' => 'Carmen', 'last_name' => 'Lira',       'email' => 'carmen@kinesilk.cl', 'phone' => '+56912345005', 'location_id' => $locCentro,      'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $pJorge  = DB::table('providers')->insertGetId(['first_name' => 'Jorge',  'last_name' => 'Peralta',   'email' => 'jorge@kinesilk.cl',  'phone' => '+56912345006', 'location_id' => $locCentro,      'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $pJorge = DB::table('providers')->insertGetId(['first_name' => 'Jorge',  'last_name' => 'Peralta',   'email' => 'jorge@kinesilk.cl',  'phone' => '+56912345006', 'location_id' => $locCentro,      'active' => true, 'created_at' => now(), 'updated_at' => now()]);
         // Las Condes: Carlos, Pilar, Sebastián
         $pCarlos = DB::table('providers')->insertGetId(['first_name' => 'Carlos', 'last_name' => 'Rojas',      'email' => 'carlos@kinesilk.cl', 'phone' => '+56912345002', 'location_id' => $locLasCondes,   'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $pPilar  = DB::table('providers')->insertGetId(['first_name' => 'Pilar',  'last_name' => 'Navarrete', 'email' => 'pilar@kinesilk.cl',  'phone' => '+56912345007', 'location_id' => $locLasCondes,   'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $pSebas  = DB::table('providers')->insertGetId(['first_name' => 'Sebastián','last_name' => 'Aguilar', 'email' => 'sebastian@kinesilk.cl','phone' => '+56912345008', 'location_id' => $locLasCondes,   'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $pPilar = DB::table('providers')->insertGetId(['first_name' => 'Pilar',  'last_name' => 'Navarrete', 'email' => 'pilar@kinesilk.cl',  'phone' => '+56912345007', 'location_id' => $locLasCondes,   'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $pSebas = DB::table('providers')->insertGetId(['first_name' => 'Sebastián', 'last_name' => 'Aguilar', 'email' => 'sebastian@kinesilk.cl', 'phone' => '+56912345008', 'location_id' => $locLasCondes,   'active' => true, 'created_at' => now(), 'updated_at' => now()]);
         // Providencia: Ana, Diego, Claudia
-        $pAna    = DB::table('providers')->insertGetId(['first_name' => 'Ana',    'last_name' => 'Fernández',  'email' => 'ana@kinesilk.cl',    'phone' => '+56912345003', 'location_id' => $locProvidencia, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $pDiego  = DB::table('providers')->insertGetId(['first_name' => 'Diego',  'last_name' => 'Morales',    'email' => 'diego@kinesilk.cl',  'phone' => '+56912345004', 'location_id' => $locProvidencia, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $pClaudia= DB::table('providers')->insertGetId(['first_name' => 'Claudia','last_name' => 'Sandoval',  'email' => 'claudia@kinesilk.cl', 'phone' => '+56912345009', 'location_id' => $locProvidencia, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $pAna = DB::table('providers')->insertGetId(['first_name' => 'Ana',    'last_name' => 'Fernández',  'email' => 'ana@kinesilk.cl',    'phone' => '+56912345003', 'location_id' => $locProvidencia, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $pDiego = DB::table('providers')->insertGetId(['first_name' => 'Diego',  'last_name' => 'Morales',    'email' => 'diego@kinesilk.cl',  'phone' => '+56912345004', 'location_id' => $locProvidencia, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $pClaudia = DB::table('providers')->insertGetId(['first_name' => 'Claudia', 'last_name' => 'Sandoval',  'email' => 'claudia@kinesilk.cl', 'phone' => '+56912345009', 'location_id' => $locProvidencia, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
 
         // ── Provider ↔ Service ────────────────────────────────────────
         DB::table('provider_service')->insert([
@@ -59,8 +59,8 @@ class TestDataSeeder extends Seeder
             ['provider_id' => $pDiego,  'service_id' => $svcKinesio],
             ['provider_id' => $pDiego,  'service_id' => $svcDeportivo],
             ['provider_id' => $pDiego,  'service_id' => $svcRelajante],
-            ['provider_id' => $pClaudia,'service_id' => $svcDrenaje],
-            ['provider_id' => $pClaudia,'service_id' => $svcRelajante],
+            ['provider_id' => $pClaudia, 'service_id' => $svcDrenaje],
+            ['provider_id' => $pClaudia, 'service_id' => $svcRelajante],
         ]);
 
         // ── Booking statuses — IDs fijos para coincidir con el front ──
@@ -91,9 +91,9 @@ class TestDataSeeder extends Seeder
         foreach ($clients as [$fn, $ln, $email, $phone, $gender, $rut, $notes]) {
             $c[] = DB::table('clients')->insertGetId([
                 'first_name' => $fn,    'last_name' => $ln,
-                'email'      => $email, 'phone'     => $phone,
-                'rut'        => $rut,   'gender'    => $gender,
-                'notes'      => $notes, 'active'    => true,
+                'email' => $email, 'phone' => $phone,
+                'rut' => $rut,   'gender' => $gender,
+                'notes' => $notes, 'active' => true,
                 'created_at' => now(),  'updated_at' => now(),
             ]);
         }
@@ -109,11 +109,11 @@ class TestDataSeeder extends Seeder
             // Las Condes
             ['name' => 'Carlos Rojas',       'email' => 'carlos@kinesilk.cl',    'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pCarlos, 'created_at' => now(), 'updated_at' => now()],
             ['name' => 'Pilar Navarrete',    'email' => 'pilar@kinesilk.cl',     'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pPilar,  'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'Sebastián Aguilar',  'email' => 'sebastian@kinesilk.cl','password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pSebas,  'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Sebastián Aguilar',  'email' => 'sebastian@kinesilk.cl', 'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pSebas,  'created_at' => now(), 'updated_at' => now()],
             // Providencia
             ['name' => 'Ana Fernández',      'email' => 'ana@kinesilk.cl',       'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pAna,    'created_at' => now(), 'updated_at' => now()],
             ['name' => 'Diego Morales',      'email' => 'diego@kinesilk.cl',     'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pDiego,  'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'Claudia Sandoval',   'email' => 'claudia@kinesilk.cl',   'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pClaudia,'created_at' => now(), 'updated_at' => now()],
+            ['name' => 'Claudia Sandoval',   'email' => 'claudia@kinesilk.cl',   'password' => Hash::make('password'), 'role' => 'provider', 'provider_id' => $pClaudia, 'created_at' => now(), 'updated_at' => now()],
         ]);
 
         // ── Bookings semana 4–10 may 2026 ────────────────────────────
@@ -176,8 +176,8 @@ class TestDataSeeder extends Seeder
 
         // ── Service packs ─────────────────────────────────────────────
         $packRelajante6 = DB::table('service_packs')->insertGetId(['service_id' => $svcRelajante, 'name' => 'Pack Masaje Relajante x6', 'total_sessions' => 6, 'price' => 189000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $packKinesio8   = DB::table('service_packs')->insertGetId(['service_id' => $svcKinesio,   'name' => 'Pack Kinesiología x8',     'total_sessions' => 8, 'price' => 288000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-        $packDrenaje4   = DB::table('service_packs')->insertGetId(['service_id' => $svcDrenaje,   'name' => 'Pack Drenaje Linfático x4','total_sessions' => 4, 'price' => 160000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $packKinesio8 = DB::table('service_packs')->insertGetId(['service_id' => $svcKinesio,   'name' => 'Pack Kinesiología x8',     'total_sessions' => 8, 'price' => 288000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $packDrenaje4 = DB::table('service_packs')->insertGetId(['service_id' => $svcDrenaje,   'name' => 'Pack Drenaje Linfático x4', 'total_sessions' => 4, 'price' => 160000, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
 
         // ── Client packs ──────────────────────────────────────────────
         // c[0]=Laura  — relajante x6, usadas 2 (lun idx0, mar idx10, sáb idx30 = sesiones 1/2/3)
@@ -190,33 +190,33 @@ class TestDataSeeder extends Seeder
         $bookingIds = [];
         foreach ($bookings as [$start, $end, $clientId, $serviceId, $providerId, $locationId, $statusId, $price, $payment]) {
             $bookingId = DB::table('bookings')->insertGetId([
-                'client_id'   => $clientId,
-                'service_id'  => $serviceId,
+                'client_id' => $clientId,
+                'service_id' => $serviceId,
                 'provider_id' => $providerId,
                 'location_id' => $locationId,
-                'status_id'   => $statusId,
-                'start_time'  => $start,
-                'end_time'    => $end,
-                'price'       => $price,
-                'created_at'  => now(),
-                'updated_at'  => now(),
+                'status_id' => $statusId,
+                'start_time' => $start,
+                'end_time' => $end,
+                'price' => $price,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
             $bookingIds[] = $bookingId;
 
             if ($payment !== null) {
                 $paidAmount = match ($payment) {
-                    'paid'    => $price,
+                    'paid' => $price,
                     'partial' => round($price * 0.5),
-                    'unpaid'  => 0,
+                    'unpaid' => 0,
                 };
                 DB::table('sales')->insert([
-                    'booking_id'     => $bookingId,
-                    'total'          => $price,
-                    'paid_amount'    => $paidAmount,
+                    'booking_id' => $bookingId,
+                    'total' => $price,
+                    'paid_amount' => $paidAmount,
                     'payment_method' => $payment === 'unpaid' ? null : 'transferencia',
-                    'paid_at'        => $payment === 'paid' ? now()->subDay() : null,
-                    'created_at'     => now(),
-                    'updated_at'     => now(),
+                    'paid_at' => $payment === 'paid' ? now()->subDay() : null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ]);
             }
         }

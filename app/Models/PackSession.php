@@ -13,9 +13,9 @@ class PackSession extends Model
     ];
 
     protected $casts = [
-        'attended_at'    => 'datetime',
+        'attended_at' => 'datetime',
         'session_number' => 'integer',
-        'price'          => 'decimal:2',
+        'price' => 'decimal:2',
     ];
 
     public function clientPack()

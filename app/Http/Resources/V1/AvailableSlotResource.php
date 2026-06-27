@@ -10,10 +10,10 @@ class AvailableSlotResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'start'            => $this['start'],
-            'end'              => $this['end'],
+            'start' => $this['start'],
+            'end' => $this['end'],
             'duration_minutes' => $this['duration_minutes'],
-            'provider_id'      => $this['provider_id'],
+            'provider_id' => $this['provider_id'],
         ];
     }
 }

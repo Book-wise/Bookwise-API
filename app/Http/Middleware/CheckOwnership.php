@@ -24,9 +24,9 @@ class CheckOwnership
                 ->where('user_id', $user->id)
                 ->first();
 
-            if (!$userProvider) {
+            if (! $userProvider) {
                 return response()->json([
-                    'error'  => 'forbidden',
+                    'error' => 'forbidden',
                     'detail' => 'Provider profile not found.',
                 ], 403);
             }

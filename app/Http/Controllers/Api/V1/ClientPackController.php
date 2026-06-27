@@ -6,8 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\V1\PackSessionResource;
 use App\Models\ClientPack;
 use App\Models\PackSession;
-use Illuminate\Http\Request;
+use App\Models\ServicePack;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class ClientPackController extends Controller
 {
@@ -24,39 +25,39 @@ class ClientPackController extends Controller
     public function show(int $id, Request $request): JsonResponse
     {
         $pack = ClientPack::with([
-                'servicePack.service',
-                'sessions' => fn($q) => $q->orderBy('session_number'),
-                'sessions.clientPack.servicePack.service',
-                'sessions.booking.provider',
-                'sessions.booking.location',
-                'sessions.booking.status',
-                'client',
-            ])
+            'servicePack.service',
+            'sessions' => fn ($q) => $q->orderBy('session_number'),
+            'sessions.clientPack.servicePack.service',
+            'sessions.booking.provider',
+            'sessions.booking.location',
+            'sessions.booking.status',
+            'client',
+        ])
             ->where('client_id', $request->user()->id)
             ->findOrFail($id);
 
         return response()->json([
             'data' => [
-                'id'             => $pack->id,
-                'client_id'      => $pack->client_id,
-                'service_pack'   => [
-                    'id'             => $pack->servicePack->id,
-                    'name'           => $pack->servicePack->name,
+                'id' => $pack->id,
+                'client_id' => $pack->client_id,
+                'service_pack' => [
+                    'id' => $pack->servicePack->id,
+                    'name' => $pack->servicePack->name,
                     'total_sessions' => $pack->servicePack->total_sessions,
-                    'price'          => $pack->servicePack->price,
-                    'service'        => [
-                        'id'    => $pack->servicePack->service->id,
-                        'name'  => $pack->servicePack->service->name,
+                    'price' => $pack->servicePack->price,
+                    'service' => [
+                        'id' => $pack->servicePack->service->id,
+                        'name' => $pack->servicePack->service->name,
                         'price' => $pack->servicePack->service->price,
                     ],
                 ],
-                'sessions'       => PackSessionResource::collection($pack->sessions),
+                'sessions' => PackSessionResource::collection($pack->sessions),
             ],
             'meta' => [
-                'total_sessions'           => $pack->total_sessions,
-                'used_sessions'            => $pack->used_sessions,
-                'remaining_sessions'       => $pack->remaining_sessions,
-                'status'                   => $pack->status,
+                'total_sessions' => $pack->total_sessions,
+                'used_sessions' => $pack->used_sessions,
+                'remaining_sessions' => $pack->remaining_sessions,
+                'status' => $pack->status,
                 'default_price_per_session' => (float) ($pack->servicePack->service->price ?? 0),
             ],
         ]);
@@ -65,20 +66,20 @@ class ClientPackController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'client_id'       => ['required', 'integer', 'exists:clients,id'],
+            'client_id' => ['required', 'integer', 'exists:clients,id'],
             'service_pack_id' => ['required', 'integer', 'exists:service_packs,id'],
-            'wc_order_id'     => ['nullable', 'integer'],
+            'wc_order_id' => ['nullable', 'integer'],
         ]);
 
-        $servicePack = \App\Models\ServicePack::findOrFail($validated['service_pack_id']);
+        $servicePack = ServicePack::findOrFail($validated['service_pack_id']);
 
         $clientPack = ClientPack::create([
-            'client_id'       => $validated['client_id'],
+            'client_id' => $validated['client_id'],
             'service_pack_id' => $validated['service_pack_id'],
-            'wc_order_id'     => $validated['wc_order_id'] ?? null,
-            'total_sessions'  => $servicePack->total_sessions,
-            'used_sessions'   => 0,
-            'status'          => 'active',
+            'wc_order_id' => $validated['wc_order_id'] ?? null,
+            'total_sessions' => $servicePack->total_sessions,
+            'used_sessions' => 0,
+            'status' => 'active',
         ]);
 
         // Crear las sesiones individuales
@@ -86,7 +87,7 @@ class ClientPackController extends Controller
             PackSession::create([
                 'client_pack_id' => $clientPack->id,
                 'session_number' => $i,
-                'status'         => 'pending',
+                'status' => 'pending',
             ]);
         }
 
@@ -98,20 +99,20 @@ class ClientPackController extends Controller
     public function use(int $id, Request $request): JsonResponse
     {
         $pack = ClientPack::when(
-            !$request->user()->isAdmin(),
-            fn($q) => $q->where('client_id', $request->user()->id)
+            ! $request->user()->isAdmin(),
+            fn ($q) => $q->where('client_id', $request->user()->id)
         )->findOrFail($id);
 
         if ($pack->status !== 'active') {
             return response()->json([
-                'error'  => 'pack_not_active',
+                'error' => 'pack_not_active',
                 'detail' => 'This pack is not active.',
             ], 422);
         }
 
         if ($pack->remaining_sessions <= 0) {
             return response()->json([
-                'error'  => 'no_sessions_remaining',
+                'error' => 'no_sessions_remaining',
                 'detail' => 'No sessions remaining in this pack.',
             ], 422);
         }
@@ -127,7 +128,7 @@ class ClientPackController extends Controller
 
         $session->update([
             'booking_id' => $validated['booking_id'],
-            'status'     => 'scheduled',
+            'status' => 'scheduled',
         ]);
 
         $pack->increment('used_sessions');
@@ -140,8 +141,8 @@ class ClientPackController extends Controller
             'data' => $pack->fresh()->load(['sessions']),
             'meta' => [
                 'remaining_sessions' => $pack->fresh()->remaining_sessions,
-                'session_used'       => $session->session_number,
-            ]
+                'session_used' => $session->session_number,
+            ],
         ]);
     }
 

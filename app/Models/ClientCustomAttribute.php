@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class ClientCustomAttribute extends Model
 {
     protected $fillable = [
-        'client_id', 'custom_attribute_template_id', 'value'
+        'client_id', 'custom_attribute_template_id', 'value',
     ];
 
     public function client()

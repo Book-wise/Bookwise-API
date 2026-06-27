@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\DB;
 class SalesTransactionsSeeder extends Seeder
 {
     private array $methods = ['transferencia', 'efectivo', 'tarjeta', 'débito'];
-    private int   $mIdx    = 0;
+
+    private int $mIdx = 0;
 
     public function run(): void
     {
@@ -25,19 +26,19 @@ class SalesTransactionsSeeder extends Seeder
         // Creamos transacciones que reflejen ese estado para el tab de pagos.
         $existingSales = DB::table('sales')
             ->where('paid_amount', '>', 0)
-            ->whereNotExists(fn($q) => $q->from('sale_transactions')->whereColumn('sale_transactions.sale_id', 'sales.id'))
+            ->whereNotExists(fn ($q) => $q->from('sale_transactions')->whereColumn('sale_transactions.sale_id', 'sales.id'))
             ->get();
 
         foreach ($existingSales as $sale) {
-            $paid  = (float) $sale->paid_amount;
+            $paid = (float) $sale->paid_amount;
             $total = (float) $sale->total;
 
             if ($paid >= $total) {
                 // Pagado completo — algunos en 2 cuotas para variedad
                 if ($sale->id % 3 === 0) {
                     $primera = (int) round($paid * 0.6);
-                    $this->insertTransaction($sale->id, $primera,        'Primer abono',      now()->subDays(7));
-                    $this->insertTransaction($sale->id, $paid - $primera, 'Saldo cancelado',  now()->subDays(2));
+                    $this->insertTransaction($sale->id, $primera, 'Primer abono', now()->subDays(7));
+                    $this->insertTransaction($sale->id, $paid - $primera, 'Saldo cancelado', now()->subDays(2));
                 } else {
                     $this->insertTransaction($sale->id, $paid, 'Pago total de la sesión', now()->subDays(rand(1, 5)));
                 }
@@ -57,7 +58,7 @@ class SalesTransactionsSeeder extends Seeder
                 'service_packs.name as pack_name',
                 'services.price as session_price'
             )
-            ->whereNotExists(fn($q) => $q->from('sales')->whereColumn('sales.client_pack_id', 'client_packs.id'))
+            ->whereNotExists(fn ($q) => $q->from('sales')->whereColumn('sales.client_pack_id', 'client_packs.id'))
             ->get();
 
         $packStates = ['paid', 'partial', 'unpaid'];
@@ -67,25 +68,25 @@ class SalesTransactionsSeeder extends Seeder
             $total = (float) $cp->session_price * (int) $cp->total_sessions;
 
             $paidAmount = match ($state) {
-                'paid'    => $total,
+                'paid' => $total,
                 'partial' => (int) round($total * 0.4),
-                default   => 0,
+                default => 0,
             };
 
             $saleId = DB::table('sales')->insertGetId([
                 'client_pack_id' => $cp->id,
-                'client_id'      => $cp->client_id,
-                'total'          => $total,
-                'paid_amount'    => $paidAmount,
+                'client_id' => $cp->client_id,
+                'total' => $total,
+                'paid_amount' => $paidAmount,
                 'payment_method' => $state !== 'unpaid' ? $this->method() : null,
-                'paid_at'        => $state === 'paid' ? now()->subDays(rand(3, 10)) : null,
-                'created_at'     => now(),
-                'updated_at'     => now(),
+                'paid_at' => $state === 'paid' ? now()->subDays(rand(3, 10)) : null,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
 
             if ($state === 'paid') {
                 $primera = (int) round($total * 0.5);
-                $this->insertTransaction($saleId, $primera,         "Primer abono — {$cp->pack_name}", now()->subDays(10));
+                $this->insertTransaction($saleId, $primera, "Primer abono — {$cp->pack_name}", now()->subDays(10));
                 $this->insertTransaction($saleId, $total - $primera, 'Saldo total del pack cancelado', now()->subDays(3));
             } elseif ($state === 'partial') {
                 $this->insertTransaction($saleId, $paidAmount, "Abono inicial — {$cp->pack_name}", now()->subDays(5));
@@ -98,35 +99,35 @@ class SalesTransactionsSeeder extends Seeder
             ->leftJoin('sales', 'bookings.id', '=', 'sales.booking_id')
             ->whereNull('sales.id')
             ->whereDate('bookings.start_time', '>=', '2026-05-25')
-            ->whereDate('bookings.start_time', '<',  now()->toDateString())
-            ->whereNotExists(fn($q) => $q->from('pack_sessions')->whereColumn('pack_sessions.booking_id', 'bookings.id'))
+            ->whereDate('bookings.start_time', '<', now()->toDateString())
+            ->whereNotExists(fn ($q) => $q->from('pack_sessions')->whereColumn('pack_sessions.booking_id', 'bookings.id'))
             ->select('bookings.id', 'bookings.client_id', 'bookings.price', 'bookings.service_id')
             ->get();
 
         $pastStates = ['paid', 'paid', 'partial', 'unpaid', 'paid', 'partial'];
-        $stateIdx   = 0;
+        $stateIdx = 0;
 
         foreach ($pastBookings as $booking) {
             $state = $pastStates[$stateIdx % count($pastStates)];
             $total = (float) $booking->price;
 
             $paidAmount = match ($state) {
-                'paid'    => $total,
+                'paid' => $total,
                 'partial' => (int) round($total * 0.5),
-                default   => 0,
+                default => 0,
             };
 
             $method = $state !== 'unpaid' ? $this->method() : null;
 
             $saleId = DB::table('sales')->insertGetId([
-                'booking_id'     => $booking->id,
-                'client_id'      => $booking->client_id,
-                'total'          => $total,
-                'paid_amount'    => $paidAmount,
+                'booking_id' => $booking->id,
+                'client_id' => $booking->client_id,
+                'total' => $total,
+                'paid_amount' => $paidAmount,
                 'payment_method' => $method,
-                'paid_at'        => $state === 'paid' ? now()->subDays(1) : null,
-                'created_at'     => now(),
-                'updated_at'     => now(),
+                'paid_at' => $state === 'paid' ? now()->subDays(1) : null,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
 
             if ($state === 'paid') {
@@ -144,26 +145,26 @@ class SalesTransactionsSeeder extends Seeder
             ->whereNull('sales.id')
             ->whereDate('bookings.start_time', '>=', '2026-06-01')
             ->whereDate('bookings.start_time', '<=', '2026-06-07')
-            ->whereNotExists(fn($q) => $q->from('pack_sessions')->whereColumn('pack_sessions.booking_id', 'bookings.id'))
+            ->whereNotExists(fn ($q) => $q->from('pack_sessions')->whereColumn('pack_sessions.booking_id', 'bookings.id'))
             ->select('bookings.id', 'bookings.client_id', 'bookings.price')
             ->orderBy('bookings.start_time')
             ->get();
 
         // Solo la mitad recibe anticipo — excluye sesiones de pack
         foreach ($futureBookings->chunk(2) as $pair) {
-            $booking    = $pair->first();
-            $total      = (float) $booking->price;
-            $anticipo   = (int) round($total * 0.3);
+            $booking = $pair->first();
+            $total = (float) $booking->price;
+            $anticipo = (int) round($total * 0.3);
 
             $saleId = DB::table('sales')->insertGetId([
-                'booking_id'     => $booking->id,
-                'client_id'      => $booking->client_id,
-                'total'          => $total,
-                'paid_amount'    => $anticipo,
+                'booking_id' => $booking->id,
+                'client_id' => $booking->client_id,
+                'total' => $total,
+                'paid_amount' => $anticipo,
                 'payment_method' => 'transferencia',
-                'paid_at'        => null,
-                'created_at'     => now(),
-                'updated_at'     => now(),
+                'paid_at' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
 
             $this->insertTransaction(
@@ -178,13 +179,13 @@ class SalesTransactionsSeeder extends Seeder
     private function insertTransaction(int $saleId, float $amount, ?string $notes, \DateTimeInterface $paidAt): void
     {
         DB::table('sale_transactions')->insert([
-            'sale_id'        => $saleId,
-            'amount'         => $amount,
+            'sale_id' => $saleId,
+            'amount' => $amount,
             'payment_method' => $this->method(),
-            'notes'          => $notes,
-            'paid_at'        => $paidAt,
-            'created_at'     => now(),
-            'updated_at'     => now(),
+            'notes' => $notes,
+            'paid_at' => $paidAt,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 

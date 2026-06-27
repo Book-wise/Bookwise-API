@@ -20,30 +20,30 @@ class PackBookingsThisWeekSeeder extends Seeder
     {
         // ── Resolve IDs ───────────────────────────────────────────
         $providers = DB::table('providers')->pluck('id', 'email');
-        $services  = DB::table('services')->pluck('id', 'name');
+        $services = DB::table('services')->pluck('id', 'name');
         $locations = DB::table('locations')->pluck('id', 'name');
-        $packs     = DB::table('service_packs')->pluck('id', 'name');
-        $clients   = DB::table('clients')->orderBy('id')->pluck('id')->values();
+        $packs = DB::table('service_packs')->pluck('id', 'name');
+        $clients = DB::table('clients')->orderBy('id')->pluck('id')->values();
 
         $pMaria = $providers['maria@kinesilk.cl'];
         $pJorge = $providers['jorge@kinesilk.cl'];
-        $pAna   = $providers['ana@kinesilk.cl'];
+        $pAna = $providers['ana@kinesilk.cl'];
 
         $sRelajante = $services['Masaje Relajante'];
-        $sKinesio   = $services['Kinesiología'];
-        $sDrenaje   = $services['Drenaje Linfático'];
+        $sKinesio = $services['Kinesiología'];
+        $sDrenaje = $services['Drenaje Linfático'];
 
-        $lCentro      = $locations['Kinesilk Centro'];
+        $lCentro = $locations['Kinesilk Centro'];
         $lProvidencia = $locations['Kinesilk Providencia'];
 
         $packRelajante6 = $packs['Pack Masaje Relajante x6'];
-        $packKinesio8   = $packs['Pack Kinesiología x8'];
-        $packDrenaje4   = $packs['Pack Drenaje Linfático x4'];
+        $packKinesio8 = $packs['Pack Kinesiología x8'];
+        $packDrenaje4 = $packs['Pack Drenaje Linfático x4'];
 
         // Clients not yet assigned to a pack: Valentina(2), Camila(4), Matías(7)
         $cValentina = $clients[2];
-        $cCamila    = $clients[4];
-        $cMatias    = $clients[7];
+        $cCamila = $clients[4];
+        $cMatias = $clients[7];
 
         $statusId = DB::table('booking_statuses')->where('name', 'Confirmado')->value('id') ?? 2;
 
@@ -53,13 +53,13 @@ class PackBookingsThisWeekSeeder extends Seeder
         // Sale: 3 transactions → partial ($153,000 / $189,000)
         // ══════════════════════════════════════════════════════════
         $cp1 = DB::table('client_packs')->insertGetId([
-            'client_id'       => $cValentina,
+            'client_id' => $cValentina,
             'service_pack_id' => $packRelajante6,
-            'total_sessions'  => 6,
-            'used_sessions'   => 2,
-            'status'          => 'active',
-            'created_at'      => now(),
-            'updated_at'      => now(),
+            'total_sessions' => 6,
+            'used_sessions' => 2,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         $b1Sessions = [
@@ -71,16 +71,16 @@ class PackBookingsThisWeekSeeder extends Seeder
         $b1Ids = [];
         foreach ($b1Sessions as $sess) {
             $b1Ids[] = DB::table('bookings')->insertGetId([
-                'client_id'   => $cValentina,
-                'service_id'  => $sRelajante,
+                'client_id' => $cValentina,
+                'service_id' => $sRelajante,
                 'provider_id' => $pMaria,
                 'location_id' => $lCentro,
-                'status_id'   => $statusId,
-                'start_time'  => $sess[0],
-                'end_time'    => $sess[1],
-                'price'       => 35000,
-                'created_at'  => now(),
-                'updated_at'  => now(),
+                'status_id' => $statusId,
+                'start_time' => $sess[0],
+                'end_time' => $sess[1],
+                'price' => 35000,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
         }
 
@@ -96,13 +96,13 @@ class PackBookingsThisWeekSeeder extends Seeder
         // total = 35.000 × 6 sesiones = 210.000
         $sale1 = DB::table('sales')->insertGetId([
             'client_pack_id' => $cp1,
-            'client_id'      => $cValentina,
-            'total'          => 210000,
-            'paid_amount'    => 153000,
+            'client_id' => $cValentina,
+            'total' => 210000,
+            'paid_amount' => 153000,
             'payment_method' => 'transferencia',
-            'paid_at'        => null,
-            'created_at'     => now(),
-            'updated_at'     => now(),
+            'paid_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         DB::table('sale_transactions')->insert([
@@ -117,13 +117,13 @@ class PackBookingsThisWeekSeeder extends Seeder
         // Sale: 2 transactions → partial ($200,000 / $288,000)
         // ══════════════════════════════════════════════════════════
         $cp2 = DB::table('client_packs')->insertGetId([
-            'client_id'       => $cCamila,
+            'client_id' => $cCamila,
             'service_pack_id' => $packKinesio8,
-            'total_sessions'  => 8,
-            'used_sessions'   => 2,
-            'status'          => 'active',
-            'created_at'      => now(),
-            'updated_at'      => now(),
+            'total_sessions' => 8,
+            'used_sessions' => 2,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         $b2Ids = [];
@@ -132,21 +132,21 @@ class PackBookingsThisWeekSeeder extends Seeder
             ['2026-05-28 09:00:00', '2026-05-28 10:00:00'],
         ] as $slot) {
             $b2Ids[] = DB::table('bookings')->insertGetId([
-                'client_id'   => $cCamila,
-                'service_id'  => $sKinesio,
+                'client_id' => $cCamila,
+                'service_id' => $sKinesio,
                 'provider_id' => $pAna,
                 'location_id' => $lProvidencia,
-                'status_id'   => $statusId,
-                'start_time'  => $slot[0],
-                'end_time'    => $slot[1],
-                'price'       => 40000,
-                'created_at'  => now(),
-                'updated_at'  => now(),
+                'status_id' => $statusId,
+                'start_time' => $slot[0],
+                'end_time' => $slot[1],
+                'price' => 40000,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
         }
 
         $pendingSessions = array_map(
-            fn($n) => ['client_pack_id' => $cp2, 'booking_id' => null, 'session_number' => $n, 'status' => 'pending', 'attended_at' => null, 'created_at' => now(), 'updated_at' => now()],
+            fn ($n) => ['client_pack_id' => $cp2, 'booking_id' => null, 'session_number' => $n, 'status' => 'pending', 'attended_at' => null, 'created_at' => now(), 'updated_at' => now()],
             range(3, 8)
         );
 
@@ -158,13 +158,13 @@ class PackBookingsThisWeekSeeder extends Seeder
         // total = 40.000 × 8 sesiones = 320.000
         $sale2 = DB::table('sales')->insertGetId([
             'client_pack_id' => $cp2,
-            'client_id'      => $cCamila,
-            'total'          => 320000,
-            'paid_amount'    => 200000,
+            'client_id' => $cCamila,
+            'total' => 320000,
+            'paid_amount' => 200000,
             'payment_method' => 'tarjeta',
-            'paid_at'        => null,
-            'created_at'     => now(),
-            'updated_at'     => now(),
+            'paid_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         DB::table('sale_transactions')->insert([
@@ -178,13 +178,13 @@ class PackBookingsThisWeekSeeder extends Seeder
         // Sale: 2 transacciones → pagado completo ($160,000 / $160,000)
         // ══════════════════════════════════════════════════════════
         $cp3 = DB::table('client_packs')->insertGetId([
-            'client_id'       => $cMatias,
+            'client_id' => $cMatias,
             'service_pack_id' => $packDrenaje4,
-            'total_sessions'  => 4,
-            'used_sessions'   => 1,
-            'status'          => 'active',
-            'created_at'      => now(),
-            'updated_at'      => now(),
+            'total_sessions' => 4,
+            'used_sessions' => 1,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         $b3Ids = [];
@@ -193,16 +193,16 @@ class PackBookingsThisWeekSeeder extends Seeder
             ['2026-05-30 13:00:00', '2026-05-30 14:30:00', 'scheduled', null],
         ] as $slot) {
             $b3Ids[] = DB::table('bookings')->insertGetId([
-                'client_id'   => $cMatias,
-                'service_id'  => $sDrenaje,
+                'client_id' => $cMatias,
+                'service_id' => $sDrenaje,
                 'provider_id' => $pJorge,
                 'location_id' => $lCentro,
-                'status_id'   => $statusId,
-                'start_time'  => $slot[0],
-                'end_time'    => $slot[1],
-                'price'       => 45000,
-                'created_at'  => now(),
-                'updated_at'  => now(),
+                'status_id' => $statusId,
+                'start_time' => $slot[0],
+                'end_time' => $slot[1],
+                'price' => 45000,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
         }
 
@@ -216,18 +216,18 @@ class PackBookingsThisWeekSeeder extends Seeder
         // total = 45.000 × 4 sesiones = 180.000 → pago parcial (160.000 / 180.000)
         $sale3 = DB::table('sales')->insertGetId([
             'client_pack_id' => $cp3,
-            'client_id'      => $cMatias,
-            'total'          => 180000,
-            'paid_amount'    => 160000,
+            'client_id' => $cMatias,
+            'total' => 180000,
+            'paid_amount' => 160000,
             'payment_method' => 'efectivo',
-            'paid_at'        => null,
-            'created_at'     => now(),
-            'updated_at'     => now(),
+            'paid_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         DB::table('sale_transactions')->insert([
             ['sale_id' => $sale3, 'amount' => 100000, 'payment_method' => 'efectivo',      'notes' => 'Abono inicial — pack drenaje linfático', 'paid_at' => '2026-05-27 13:00:00', 'created_at' => now(), 'updated_at' => now()],
-            ['sale_id' => $sale3, 'amount' =>  60000, 'payment_method' => 'transferencia', 'notes' => 'Segundo abono — saldo pendiente $20.000', 'paid_at' => '2026-05-28 10:00:00', 'created_at' => now(), 'updated_at' => now()],
+            ['sale_id' => $sale3, 'amount' => 60000, 'payment_method' => 'transferencia', 'notes' => 'Segundo abono — saldo pendiente $20.000', 'paid_at' => '2026-05-28 10:00:00', 'created_at' => now(), 'updated_at' => now()],
         ]);
     }
 }

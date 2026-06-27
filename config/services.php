@@ -36,10 +36,10 @@ return [
     ],
 
     'woocommerce' => [
-        'consumer_key'    => env('WC_CONSUMER_KEY'),
+        'consumer_key' => env('WC_CONSUMER_KEY'),
         'consumer_secret' => env('WC_CONSUMER_SECRET'),
-        'webhook_secret'  => env('WC_WEBHOOK_SECRET'),
-        'store_url'       => env('WC_STORE_URL'),
+        'webhook_secret' => env('WC_WEBHOOK_SECRET'),
+        'store_url' => env('WC_STORE_URL'),
     ],
 
 ];

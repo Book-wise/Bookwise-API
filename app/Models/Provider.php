@@ -12,7 +12,7 @@ class Provider extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'user_id', 'first_name', 'last_name', 'email', 'phone', 'location_id', 'active'
+        'user_id', 'first_name', 'last_name', 'email', 'phone', 'location_id', 'active',
     ];
 
     protected $casts = [
