@@ -125,6 +125,13 @@ class BookingController extends Controller
 
         $startTime = Carbon::parse($validated['start_time']);
 
+        if ($startTime->isPast()) {
+            return response()->json([
+                'error' => 'past_booking',
+                'detail' => 'Cannot create a booking in the past.',
+            ], 422);
+        }
+
         // Duración efectiva
         $effectiveDuration = $validated['duration_minutes']
             ?? $service->duration_minutes
@@ -144,9 +151,10 @@ class BookingController extends Controller
         );
 
         if ($conflict) {
+            $conflict->load(['client', 'provider']);
+
             $conflictType = match (true) {
                 $conflict->provider_id === (int) $validated['provider_id'] => 'Provider overlap with existing booking',
-                $conflict->location_id === (int) $validated['location_id'] => 'Location overlap with existing booking',
                 default => 'Client overlap with existing booking',
             };
 
@@ -157,6 +165,16 @@ class BookingController extends Controller
                     'id' => $conflict->id,
                     'start_time' => $conflict->start_time->toIso8601String(),
                     'end_time' => $conflict->end_time->toIso8601String(),
+                    'client' => [
+                        'id' => $conflict->client->id,
+                        'first_name' => $conflict->client->first_name,
+                        'last_name' => $conflict->client->last_name,
+                    ],
+                    'provider' => [
+                        'id' => $conflict->provider->id,
+                        'first_name' => $conflict->provider->first_name,
+                        'last_name' => $conflict->provider->last_name,
+                    ],
                 ],
             ], 409);
         }
@@ -212,6 +230,13 @@ class BookingController extends Controller
                 ? Carbon::parse($validated['start_time'])
                 : $booking->start_time;
 
+            if (isset($validated['start_time']) && $startTime->isPast()) {
+                return response()->json([
+                    'error' => 'past_booking',
+                    'detail' => 'Cannot move a booking to the past.',
+                ], 422);
+            }
+
             $endTime = isset($validated['end_time'])
                 ? Carbon::parse($validated['end_time'])
                 : ($booking->end_time ?? $startTime->copy()->addMinutes($booking->effective_duration_minutes));
@@ -230,9 +255,10 @@ class BookingController extends Controller
             );
 
             if ($conflict) {
+                $conflict->load(['client', 'provider']);
+
                 $conflictType = match (true) {
                     $conflict->provider_id === (int) $providerId => 'Provider overlap with existing booking',
-                    $conflict->location_id === (int) $locationId => 'Location overlap with existing booking',
                     default => 'Client overlap with existing booking',
                 };
 
@@ -243,6 +269,16 @@ class BookingController extends Controller
                         'id' => $conflict->id,
                         'start_time' => $conflict->start_time->toIso8601String(),
                         'end_time' => $conflict->end_time->toIso8601String(),
+                        'client' => [
+                            'id' => $conflict->client->id,
+                            'first_name' => $conflict->client->first_name,
+                            'last_name' => $conflict->client->last_name,
+                        ],
+                        'provider' => [
+                            'id' => $conflict->provider->id,
+                            'first_name' => $conflict->provider->first_name,
+                            'last_name' => $conflict->provider->last_name,
+                        ],
                     ],
                 ], 409);
             }
@@ -297,7 +333,6 @@ class BookingController extends Controller
             ->first();
 
         return $base('provider_id', $providerId)
-            ?? $base('location_id', $locationId)
             ?? $base('client_id', $clientId);
     }
 }
