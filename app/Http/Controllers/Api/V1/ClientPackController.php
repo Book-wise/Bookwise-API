@@ -7,11 +7,17 @@ use App\Http\Resources\V1\PackSessionResource;
 use App\Models\ClientPack;
 use App\Models\PackSession;
 use App\Models\ServicePack;
+use App\Services\IdempotencyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ClientPackController extends Controller
 {
+    public function __construct(
+        private readonly IdempotencyService $idempotency,
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         $packs = ClientPack::with(['servicePack.service', 'sessions.booking'])
@@ -98,50 +104,107 @@ class ClientPackController extends Controller
 
     public function use(int $id, Request $request): JsonResponse
     {
-        $pack = ClientPack::when(
-            ! $request->user()->isAdmin(),
-            fn ($q) => $q->where('client_id', $request->user()->id)
-        )->findOrFail($id);
+        $endpoint = 'PATCH /v1/client-packs/'.$id.'/use';
+        $requestHash = md5($request->getContent());
+        $hasIdempotencyKey = $request->hasHeader('Idempotency-Key');
 
-        if ($pack->status !== 'active') {
-            return response()->json([
-                'error' => 'pack_not_active',
-                'detail' => 'This pack is not active.',
-            ], 422);
-        }
+        if ($hasIdempotencyKey) {
+            $cached = $this->idempotency->check($request, $endpoint);
+            if ($cached !== null) {
+                return $cached;
+            }
 
-        if ($pack->remaining_sessions <= 0) {
-            return response()->json([
-                'error' => 'no_sessions_remaining',
-                'detail' => 'No sessions remaining in this pack.',
-            ], 422);
+            $status = $this->idempotency->acquire($request, $endpoint, $requestHash);
+            if ($status === 1) {
+                return response()->json([
+                    'error' => 'conflict',
+                    'detail' => 'A request with this idempotency key is already in progress or conflicts.',
+                ], 409);
+            }
         }
 
         $validated = $request->validate([
             'booking_id' => ['required', 'integer', 'exists:bookings,id'],
         ]);
 
-        $session = $pack->sessions()
-            ->where('status', 'pending')
-            ->orderBy('session_number')
-            ->firstOrFail();
+        try {
+            $result = DB::transaction(function () use ($id, $request, $validated) {
+                $pack = ClientPack::lockForUpdate()
+                    ->when(
+                        ! $request->user()->isAdmin(),
+                        fn ($q) => $q->where('client_id', $request->user()->id)
+                    )
+                    ->findOrFail($id);
 
-        $session->update([
-            'booking_id' => $validated['booking_id'],
-            'status' => 'scheduled',
-        ]);
+                if ($pack->status !== 'active') {
+                    return ['error' => 'pack_not_active'];
+                }
 
-        $pack->increment('used_sessions');
+                if ($pack->remaining_sessions <= 0) {
+                    return ['error' => 'no_sessions_remaining'];
+                }
 
-        if ($pack->fresh()->remaining_sessions === 0) {
-            $pack->update(['status' => 'completed']);
+                $session = $pack->sessions()
+                    ->where('status', 'pending')
+                    ->orderBy('session_number')
+                    ->firstOrFail();
+
+                $session->update([
+                    'booking_id' => $validated['booking_id'],
+                    'status' => 'scheduled',
+                ]);
+
+                $pack->increment('used_sessions');
+
+                if ($pack->fresh()->remaining_sessions === 0) {
+                    $pack->update(['status' => 'completed']);
+                }
+
+                $freshPack = $pack->fresh()->load(['sessions']);
+
+                return [
+                    'pack' => $freshPack,
+                    'session_used' => $session->session_number,
+                ];
+            });
+        } catch (\Throwable $e) {
+            if ($hasIdempotencyKey) {
+                $this->idempotency->release($request, $endpoint);
+            }
+
+            throw $e;
+        }
+
+        if (isset($result['error'])) {
+            if ($hasIdempotencyKey) {
+                $this->idempotency->release($request, $endpoint);
+            }
+
+            $detail = $result['error'] === 'pack_not_active'
+                ? 'This pack is not active.'
+                : 'No sessions remaining in this pack.';
+
+            return response()->json([
+                'error' => $result['error'],
+                'detail' => $detail,
+            ], 422);
+        }
+
+        if ($hasIdempotencyKey) {
+            $this->idempotency->store($request, $endpoint, 200, [
+                'data' => $result['pack'],
+                'meta' => [
+                    'remaining_sessions' => $result['pack']->remaining_sessions,
+                    'session_used' => $result['session_used'],
+                ],
+            ]);
         }
 
         return response()->json([
-            'data' => $pack->fresh()->load(['sessions']),
+            'data' => $result['pack'],
             'meta' => [
-                'remaining_sessions' => $pack->fresh()->remaining_sessions,
-                'session_used' => $session->session_number,
+                'remaining_sessions' => $result['pack']->remaining_sessions,
+                'session_used' => $result['session_used'],
             ],
         ]);
     }
