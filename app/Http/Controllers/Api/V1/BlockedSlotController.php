@@ -7,6 +7,7 @@ use App\Http\Resources\V1\BlockedSlotResource;
 use App\Models\BlockedSlot;
 use App\Models\Booking;
 use App\Models\Provider;
+use App\Services\IdempotencyService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,9 +16,32 @@ use Illuminate\Support\Str;
 
 class BlockedSlotController extends Controller
 {
+    public function __construct(
+        private readonly IdempotencyService $idempotency,
+    ) {}
+
     // ── POST /v1/blocked-slots ─────────────────────────────────────
     public function store(Request $request): JsonResponse
     {
+        $endpoint = 'POST /v1/blocked-slots';
+        $requestHash = md5($request->getContent());
+        $hasIdempotencyKey = $request->hasHeader('Idempotency-Key');
+
+        if ($hasIdempotencyKey) {
+            $cached = $this->idempotency->check($request, $endpoint);
+            if ($cached !== null) {
+                return $cached;
+            }
+
+            $status = $this->idempotency->acquire($request, $endpoint, $requestHash);
+            if ($status === 1) {
+                return response()->json([
+                    'error' => 'conflict',
+                    'detail' => 'A request with this idempotency key is already in progress or conflicts.',
+                ], 409);
+            }
+        }
+
         $data = $request->validate([
             'start_time' => ['required', 'date'],
             'end_time' => ['required', 'date', 'after:start_time'],
@@ -72,6 +96,13 @@ class BlockedSlotController extends Controller
                 }
             }
 
+            if ($hasIdempotencyKey) {
+                $this->idempotency->store($request, $endpoint, 201, [
+                    'blocked' => $blocked,
+                    'conflicts' => $conflicts,
+                ]);
+            }
+
             return response()->json(['blocked' => $blocked, 'conflicts' => $conflicts], 201);
         }
 
@@ -103,6 +134,12 @@ class BlockedSlotController extends Controller
                 'detail' => $detail,
                 'conflicts_with' => $result['conflict'],
             ], 409);
+        }
+
+        if ($hasIdempotencyKey) {
+            $this->idempotency->store($request, $endpoint, 201, [
+                'data' => BlockedSlotResource::collection($result['slots']),
+            ]);
         }
 
         return response()->json(['data' => BlockedSlotResource::collection($result['slots'])], 201);
