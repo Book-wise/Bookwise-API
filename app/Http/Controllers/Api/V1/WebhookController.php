@@ -124,14 +124,16 @@ class WebhookController extends Controller
             ]);
         }
 
-        Sale::firstOrCreate(
-            ['wc_order_id' => $orderId],
-            [
+        Sale::upsert(
+            [[
+                'wc_order_id' => $orderId,
                 'booking_id' => $booking->id,
                 'total' => $data['total'] ?? $booking->price,
                 'payment_method' => $data['payment_method'] ?? null,
                 'paid_at' => now(),
-            ]
+            ]],
+            ['wc_order_id'],
+            ['booking_id', 'total', 'payment_method', 'paid_at']
         );
 
         $log->update(['status' => 'processed']);
