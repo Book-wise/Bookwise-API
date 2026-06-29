@@ -6,11 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\V1\ClientResource;
 use App\Models\Client;
 use App\Rules\ChileanRutRule;
+use App\Services\IdempotencyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ClientController extends Controller
 {
+    public function __construct(
+        private readonly IdempotencyService $idempotency,
+    ) {}
+
     // ── GET /v1/me — Cliente autenticado por email ────────────────
     public function me(Request $request): JsonResponse
     {
@@ -58,6 +63,25 @@ class ClientController extends Controller
     // ── POST /v1/clients ───────────────────────────────────────────
     public function store(Request $request): JsonResponse
     {
+        $endpoint = 'POST /v1/clients';
+        $requestHash = md5($request->getContent());
+        $hasIdempotencyKey = $request->hasHeader('Idempotency-Key');
+
+        if ($hasIdempotencyKey) {
+            $cached = $this->idempotency->check($request, $endpoint);
+            if ($cached !== null) {
+                return $cached;
+            }
+
+            $status = $this->idempotency->acquire($request, $endpoint, $requestHash);
+            if ($status === 1) {
+                return response()->json([
+                    'error' => 'conflict',
+                    'detail' => 'A request with this idempotency key is already in progress or conflicts.',
+                ], 409);
+            }
+        }
+
         $validated = $request->validate([
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['nullable', 'string', 'max:100'],
@@ -70,6 +94,10 @@ class ClientController extends Controller
         ]);
 
         $client = Client::create($validated);
+
+        if ($hasIdempotencyKey) {
+            $this->idempotency->store($request, $endpoint, 201, ['data' => new ClientResource($client)]);
+        }
 
         return response()->json(['data' => new ClientResource($client)], 201);
     }
