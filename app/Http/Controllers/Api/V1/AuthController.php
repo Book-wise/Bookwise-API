@@ -14,22 +14,22 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $request->validate([
-            'email'    => ['required', 'email'],
+            'email' => ['required', 'email'],
             'password' => ['required', 'string'],
         ]);
 
         if (! Auth::attempt($request->only('email', 'password'))) {
             throw ValidationException::withMessages([
-                'email' => ['Las credenciales son incorrectas.'],
+                'email' => ['These credentials do not match our records.'],
             ]);
         }
 
-        $user  = $request->user();
+        $user = $request->user();
         $token = $user->createToken('api', $user->role->tokenAbilities())->plainTextToken;
 
         return response()->json([
             'token' => $token,
-            'user'  => new UserResource($user),
+            'user' => new UserResource($user),
         ]);
     }
 
@@ -37,6 +37,6 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json(['message' => 'Sesión cerrada.']);
+        return response()->json(['message' => 'Logged out successfully.']);
     }
 }

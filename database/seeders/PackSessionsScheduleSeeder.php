@@ -23,34 +23,34 @@ class PackSessionsScheduleSeeder extends Seeder
     {
         $providers = DB::table('providers')->pluck('id', 'email');
         $locations = DB::table('locations')->pluck('id', 'name');
-        $services  = DB::table('services')->pluck('id', 'name');
-        $statuses  = DB::table('booking_statuses')->pluck('id', 'name');
+        $services = DB::table('services')->pluck('id', 'name');
+        $statuses = DB::table('booking_statuses')->pluck('id', 'name');
 
-        $pPilar   = $providers['pilar@kinesilk.cl'];
-        $pCarlos  = $providers['carlos@kinesilk.cl'];
+        $pPilar = $providers['pilar@kinesilk.cl'];
+        $pCarlos = $providers['carlos@kinesilk.cl'];
         $pClaudia = $providers['claudia@kinesilk.cl'];
 
-        $lLasCondes   = $locations['Kinesilk Las Condes'];
+        $lLasCondes = $locations['Kinesilk Las Condes'];
         $lProvidencia = $locations['Kinesilk Providencia'];
 
         $sRelajante = $services['Masaje Relajante'];
-        $sKinesio   = $services['Kinesiología'];
-        $sDrenaje   = $services['Drenaje Linfático'];
+        $sKinesio = $services['Kinesiología'];
+        $sDrenaje = $services['Drenaje Linfático'];
 
         $statusReservado = $statuses['Reservado'] ?? 1;
 
         // Tuesdays in June 2026 (for Relajante)
-        $tuesdays  = ['2026-06-02', '2026-06-09', '2026-06-16', '2026-06-23', '2026-06-30'];
+        $tuesdays = ['2026-06-02', '2026-06-09', '2026-06-16', '2026-06-23', '2026-06-30'];
         // Wednesdays in June 2026 (for Kinesio)
         $wednesdays = ['2026-06-03', '2026-06-10', '2026-06-17', '2026-06-24'];
         // Saturdays in June 2026 (for Drenaje)
-        $saturdays  = ['2026-06-06', '2026-06-13', '2026-06-20', '2026-06-27'];
+        $saturdays = ['2026-06-06', '2026-06-13', '2026-06-20', '2026-06-27'];
 
         // Service config: [service_id, provider_id, location_id, duration_min, price, dates_pool]
         $config = [
             $sRelajante => [$pPilar,   $lLasCondes,   60, 35000, $tuesdays],
-            $sKinesio   => [$pCarlos,  $lLasCondes,   60, 40000, $wednesdays],
-            $sDrenaje   => [$pClaudia, $lProvidencia, 90, 45000, $saturdays],
+            $sKinesio => [$pCarlos,  $lLasCondes,   60, 40000, $wednesdays],
+            $sDrenaje => [$pClaudia, $lProvidencia, 90, 45000, $saturdays],
         ];
 
         // Track date index per service so sessions from different packs
@@ -86,36 +86,40 @@ class PackSessionsScheduleSeeder extends Seeder
         foreach ($toSchedule as $session) {
             $svcId = $session->service_id;
 
-            if (! isset($config[$svcId])) continue;
+            if (! isset($config[$svcId])) {
+                continue;
+            }
 
             [$providerId, $locationId, $duration, $price, $dates] = $config[$svcId];
 
             $idx = $dateIdx[$svcId];
 
-            if ($idx >= count($dates)) continue;
+            if ($idx >= count($dates)) {
+                continue;
+            }
 
-            $date      = $dates[$idx];
+            $date = $dates[$idx];
             $startTime = "{$date} 12:00:00";
-            $endTime   = date('Y-m-d H:i:s', strtotime($startTime) + $duration * 60);
+            $endTime = date('Y-m-d H:i:s', strtotime($startTime) + $duration * 60);
 
             $bookingId = DB::table('bookings')->insertGetId([
-                'client_id'   => $session->client_id,
-                'service_id'  => $svcId,
+                'client_id' => $session->client_id,
+                'service_id' => $svcId,
                 'provider_id' => $providerId,
                 'location_id' => $locationId,
-                'status_id'   => $statusReservado,
-                'start_time'  => $startTime,
-                'end_time'    => $endTime,
-                'price'       => $price,
-                'created_at'  => now(),
-                'updated_at'  => now(),
+                'status_id' => $statusReservado,
+                'start_time' => $startTime,
+                'end_time' => $endTime,
+                'price' => $price,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
 
             DB::table('pack_sessions')
                 ->where('id', $session->session_id)
                 ->update([
                     'booking_id' => $bookingId,
-                    'status'     => 'scheduled',
+                    'status' => 'scheduled',
                     'updated_at' => now(),
                 ]);
 

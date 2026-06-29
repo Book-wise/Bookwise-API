@@ -12,9 +12,9 @@ class Sale extends Model
     ];
 
     protected $casts = [
-        'total'       => 'decimal:2',
+        'total' => 'decimal:2',
         'paid_amount' => 'decimal:2',
-        'paid_at'     => 'datetime',
+        'paid_at' => 'datetime',
     ];
 
     public function booking()
@@ -49,11 +49,16 @@ class Sale extends Model
 
     public function getPaymentStatusAttribute(): string
     {
-        $paid  = (float) $this->paid_amount;
+        $paid = (float) $this->paid_amount;
         $total = (float) $this->total;
 
-        if ($paid <= 0)      return 'unpaid';
-        if ($paid >= $total) return 'paid';
+        if ($paid <= 0) {
+            return 'unpaid';
+        }
+        if ($paid >= $total) {
+            return 'paid';
+        }
+
         return 'partial';
     }
 }

@@ -8,8 +8,8 @@ use App\Models\BookingStatus;
 use App\Models\Sale;
 use App\Models\WoocommerceWebhooksLog;
 use App\Services\WooCommerceCustomerService;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class WebhookController extends Controller
 {
@@ -19,17 +19,17 @@ class WebhookController extends Controller
 
     public function handle(Request $request): JsonResponse
     {
-        $secret    = config('services.woocommerce.webhook_secret');
-        $payload   = $request->getContent();
+        $secret = config('services.woocommerce.webhook_secret');
+        $payload = $request->getContent();
         $signature = $request->header('X-WC-Webhook-Signature');
-        $expected  = base64_encode(hash_hmac('sha256', $payload, $secret, true));
+        $expected = base64_encode(hash_hmac('sha256', $payload, $secret, true));
 
-        if (!hash_equals($expected, $signature ?? '')) {
+        if (! hash_equals($expected, $signature ?? '')) {
             return response()->json(['error' => 'unauthorized', 'detail' => 'Invalid webhook signature.'], 401);
         }
 
-        $data    = json_decode($payload, true);
-        $event   = $request->header('X-WC-Webhook-Topic', 'unknown');
+        $data = json_decode($payload, true);
+        $event = $request->header('X-WC-Webhook-Topic', 'unknown');
 
         // Check for customer events first
         if (str_contains($event, 'customer.created') || str_contains($event, 'customer.updated')) {
@@ -40,12 +40,12 @@ class WebhookController extends Controller
         $orderId = $data['id'] ?? null;
 
         $log = WoocommerceWebhooksLog::create([
-            'event'        => $event,
-            'wc_order_id'  => $orderId,
+            'event' => $event,
+            'wc_order_id' => $orderId,
             'wc_entity_id' => $orderId,
-            'entity_type'  => 'order',
-            'payload'      => $payload,
-            'status'       => 'received',
+            'entity_type' => 'order',
+            'payload' => $payload,
+            'status' => 'received',
         ]);
 
         try {
@@ -58,6 +58,7 @@ class WebhookController extends Controller
             }
         } catch (\Throwable $e) {
             $log->update(['status' => 'failed', 'error_message' => $e->getMessage()]);
+
             return response()->json(['error' => 'processing_failed'], 500);
         }
 
@@ -70,11 +71,11 @@ class WebhookController extends Controller
 
         // Log the customer event
         $log = WoocommerceWebhooksLog::create([
-            'event'         => $event,
-            'wc_entity_id'  => $customerId,
-            'entity_type'   => 'customer',
-            'payload'       => json_encode($data),
-            'status'        => 'received',
+            'event' => $event,
+            'wc_entity_id' => $customerId,
+            'entity_type' => 'customer',
+            'payload' => json_encode($data),
+            'status' => 'received',
         ]);
 
         try {
@@ -82,6 +83,7 @@ class WebhookController extends Controller
             $log->update(['status' => 'processed']);
         } catch (\Throwable $e) {
             $log->update(['status' => 'failed', 'error_message' => $e->getMessage()]);
+
             return response()->json(['error' => 'processing_failed'], 500);
         }
 
@@ -90,25 +92,26 @@ class WebhookController extends Controller
 
     private function handleOrderCompleted(array $data, $log): void
     {
-        $orderId  = $data['id'] ?? null;
-        $meta     = collect($data['meta_data'] ?? []);
+        $orderId = $data['id'] ?? null;
+        $meta = collect($data['meta_data'] ?? []);
 
-        $bookingId       = $meta->firstWhere('key', '_kinesilk_booking_id')['value']      ?? null;
+        $bookingId = $meta->firstWhere('key', '_kinesilk_booking_id')['value'] ?? null;
         $durationMinutes = $meta->firstWhere('key', '_kinesilk_duration_minutes')['value'] ?? null;
 
         $booking = $bookingId
             ? Booking::find($bookingId)
             : Booking::where('wc_order_id', $orderId)->first();
 
-        if (!$booking) {
+        if (! $booking) {
             $log->update(['status' => 'processed']);
+
             return;
         }
 
         if ($durationMinutes) {
             $booking->update([
                 'custom_duration_minutes' => (int) $durationMinutes,
-                'end_time'                => $booking->start_time->copy()->addMinutes((int) $durationMinutes),
+                'end_time' => $booking->start_time->copy()->addMinutes((int) $durationMinutes),
             ]);
         }
 
@@ -117,18 +120,20 @@ class WebhookController extends Controller
             $booking->update(['status_id' => $confirmed->id, 'wc_order_id' => $orderId]);
             $booking->statusHistory()->create([
                 'status_id' => $confirmed->id,
-                'notes'     => 'Confirmed via WooCommerce order #' . $orderId,
+                'notes' => 'Confirmed via WooCommerce order #'.$orderId,
             ]);
         }
 
-        Sale::firstOrCreate(
-            ['wc_order_id' => $orderId],
-            [
-                'booking_id'     => $booking->id,
-                'total'          => $data['total'] ?? $booking->price,
+        Sale::upsert(
+            [[
+                'wc_order_id' => $orderId,
+                'booking_id' => $booking->id,
+                'total' => $data['total'] ?? $booking->price,
                 'payment_method' => $data['payment_method'] ?? null,
-                'paid_at'        => now(),
-            ]
+                'paid_at' => now(),
+            ]],
+            ['wc_order_id'],
+            ['booking_id', 'total', 'payment_method', 'paid_at']
         );
 
         $log->update(['status' => 'processed']);
@@ -139,8 +144,9 @@ class WebhookController extends Controller
         $orderId = $data['id'] ?? null;
         $booking = Booking::where('wc_order_id', $orderId)->first();
 
-        if (!$booking) {
+        if (! $booking) {
             $log->update(['status' => 'processed']);
+
             return;
         }
 
@@ -149,7 +155,7 @@ class WebhookController extends Controller
             $booking->update(['status_id' => $cancelStatus->id]);
             $booking->statusHistory()->create([
                 'status_id' => $cancelStatus->id,
-                'notes'     => 'Cancelled via WooCommerce refund order #' . $orderId,
+                'notes' => 'Cancelled via WooCommerce refund order #'.$orderId,
             ]);
         }
 

@@ -21,7 +21,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('services', function (Blueprint $table) {
-            $table->dropColumn(['slot_interval_minutes','min_duration_minutes','max_duration_minutes']);
+            $table->dropColumn(['slot_interval_minutes', 'min_duration_minutes', 'max_duration_minutes']);
         });
     }
 };

@@ -11,7 +11,7 @@ class Location extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'name', 'address', 'city', 'timezone', 'active', 'opening_time', 'closing_time'
+        'name', 'address', 'city', 'timezone', 'active', 'opening_time', 'closing_time',
     ];
 
     protected $casts = [

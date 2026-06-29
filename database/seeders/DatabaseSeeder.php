@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -22,5 +21,6 @@ class DatabaseSeeder extends Seeder
         $this->call(PackBookingsThisWeekSeeder::class);
         $this->call(SalesTransactionsSeeder::class);
         $this->call(PackSessionsScheduleSeeder::class);
+        $this->call(EvaluacionInicialSeeder::class);
     }
 }

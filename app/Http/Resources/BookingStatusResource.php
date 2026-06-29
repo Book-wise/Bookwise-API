@@ -10,9 +10,9 @@ class BookingStatusResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id'              => $this->id,
-            'name'            => $this->name,
-            'color'           => $this->color,
+            'id' => $this->id,
+            'name' => $this->name,
+            'color' => $this->color,
             'is_cancellation' => $this->is_cancellation,
         ];
     }
