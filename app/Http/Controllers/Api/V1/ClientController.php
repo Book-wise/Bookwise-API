@@ -25,7 +25,7 @@ class ClientController extends Controller
         if (! $client) {
             return response()->json([
                 'error' => 'client_not_found',
-                'detail' => 'No Kinesilk client found for this account.',
+                'detail' => 'No client found for this account.',
             ], 404);
         }
 

@@ -1,9 +1,9 @@
-# Kinesilk API
+# Bookwise API
 
 ![Bookwise Logo](assets/images/Bookwise%20logo.png)
 
-![Laravel](https://img.shields.io/badge/Laravel-11-FF2D20?logo=laravel&logoColor=white)
-![PHP](https://img.shields.io/badge/PHP-8.2-777BB4?logo=php&logoColor=white)
+![Laravel](https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white)
+![PHP](https://img.shields.io/badge/PHP-8.3-777BB4?logo=php&logoColor=white)
 ![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)
 ![Sanctum](https://img.shields.io/badge/Sanctum-Auth-FF2D20?logo=laravel&logoColor=white)
 ![Composer](https://img.shields.io/badge/Composer-2-885630?logo=composer&logoColor=white)
@@ -12,23 +12,71 @@
 ![WordPress](https://img.shields.io/badge/WordPress-Bridge-21759B?logo=wordpress&logoColor=white)
 ![REST API](https://img.shields.io/badge/REST-API-009688?logo=fastapi&logoColor=white)
 
+## Setup rápido (recién clonado)
+
+Requiere **PHP 8.3+**, **Composer**, **MySQL** y **MySQL CLI** (viene con el instalador de MySQL).
+
+```powershell
+# 1. Crear la base de datos (solo la primera vez)
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS bookwise_api"
+
+# 2. Verificar que se creó correctamente
+mysql -u root -p -e "SHOW DATABASES LIKE 'bookwise_api'"
+
+# 3. Instalar todo (dependencias, .env, key, migrations + seeders)
+composer setup
+
+# 4. Iniciar servidor
+php -S 127.0.0.1:9999 -t public
+```
+
+> El script `composer setup` encadena: `composer install` → crea `.env` si no existe → `php artisan key:generate` → `php artisan migrate --force --seed`. Si ya tenés `.env` con `APP_KEY`, no pasa nada, los comandos son idempotentes.
+
+### Configurar correo SMTP (cPanel)
+
+La app envía correos de notificación (confirmación de reserva, recordatorios, pago recibido).
+Para que funcione, creá un correo en cPanel de tu dominio y configuralo en el `.env`:
+
+```dotenv
+MAIL_MAILER=smtp
+MAIL_HOST=mail.tudominio.cl
+MAIL_PORT=465
+MAIL_USERNAME=notificaciones@tudominio.cl
+MAIL_PASSWORD=la-contraseña-del-correo
+MAIL_ENCRYPTION=ssl
+MAIL_FROM_ADDRESS="notificaciones@tudominio.cl"
+MAIL_FROM_NAME="Bookwise"
+```
+
+**Pasos en cPanel:**
+
+1. **Crear el correo**: entrar a **Email Accounts** → crear cuenta (ej. `notificaciones@tudominio.cl`)
+2. **Configurar el `.env`** con los datos de esa cuenta
+3. **Probar** con `php artisan tinker` → `Mail::raw('prueba', fn($m) => $m->to('test@example.com')->subject('test'));`
+
+> Para desarrollo podés dejar `MAIL_MAILER=log` y los correos se escriben en `storage/logs/laravel.log` en lugar de enviarse.
+
 [🇺🇸 English](#english) &nbsp;|&nbsp; [🇨🇱 Español](#español)
 
 ---
 
 ## English
 
-**REST API for scheduling, session packs, and WooCommerce sync for Kinesilk — a Chilean kinesiology clinic network.**
+**REST API for scheduling, session packs, and WooCommerce sync. Each client runs their own independent deployment with dedicated infrastructure and database.**
 
 ### What problem does it solve?
 
-Kinesilk runs multiple kinesiology clinics with independent providers per location, prepaid session packs, and sales through WooCommerce. Three problems had to be solved in one system:
+Three interconnected problems, each solved across multiple layers:
 
-1. **Collision-free scheduling** — multiple providers, multiple locations, blockable time slots with weekly repeat.
-2. **Session packs tied to bookings** — a client buys 5 sessions on WooCommerce; the API automatically deducts each session when the appointment is attended.
-3. **Bidirectional WooCommerce sync** — the e-commerce confirms bookings, records payments, and syncs clients without manual intervention.
+| # | Problem | Where it's solved | How |
+|---|---------|-------------------|-----|
+| 1 | **Collision-free scheduling** | **Bookwise App** (Angular) + **Bookwise API** | The app lets admins/providers manage calendars in real time. The API enforces collision detection (`SlotAvailabilityService`), blocks time slots, and prevents double-booking. |
+| 2 | **Session packs tied to bookings** | **Bookwise App** + **WooCommerce** (optional) + **WordPress Bridge** (optional) + **Bookwise API** | Clients can buy packs directly in the Bookwise App or through WooCommerce. WooCommerce is an independent sales channel — the bridge plugin captures orders and sends them to the API via webhook. Either way, the API creates the `ClientPack` with individual `PackSessions` and deducts one when the appointment is attended. |
+| 3 | **Bidirectional WooCommerce sync** | **WordPress Bridge** + **Bookwise API** | The bridge registers WooCommerce webhooks pointing to the API. The API processes orders, refunds, and customer changes through `WebhookController` and `WooCommerceCustomerService` — all verified via HMAC-SHA256. No polling, no manual sync. |
 
-This API is the core that connects those three worlds.
+**Sales and billing**: The Bookwise App can register sales directly without needing to issue invoices or tax documents. It can generate a basic sales receipt for the client's records. Full electronic invoicing (Chilean DTE — boletas/facturas electrónicas) is planned for a future version.
+
+**Bottom line**: The Bookwise App is the central management interface where providers and admins run the daily operation. The API is the engine that orchestrates scheduling, pack deduction, and data sync. WooCommerce serves as an optional independent sales channel connected through the WordPress bridge plugin.
 
 ### Why Laravel?
 
@@ -115,17 +163,21 @@ Full endpoint documentation on [Notion](https://www.notion.so/Kinesilk-API-Backe
 
 ## Español
 
-**API REST de agendamiento, packs de sesiones y sincronización con WooCommerce para Kinesilk — red de centros kinesiológicos en Chile.**
+**API REST de agendamiento, packs de sesiones y sincronización con WooCommerce. Cada cliente tiene su propio deploy independiente con infraestructura y base de datos dedicadas.**
 
 ### ¿Qué problema resuelve?
 
-Kinesilk opera múltiples centros kinesiológicos con profesionales independientes por sede, packs de sesiones prepagadas, y ventas a través de WooCommerce. El desafío era triple:
+Tres problemas interconectados, cada uno resuelto en múltiples capas:
 
-1. **Coordinación de agenda sin doble-booking** — múltiples profesionales, múltiples sedes, turnos bloqueables con repetición semanal.
-2. **Packs de sesiones vinculados a reservas** — un cliente compra 5 sesiones en WooCommerce y la API descuenta automáticamente cada sesión al atenderse.
-3. **Sincronización bidireccional con WooCommerce** — el e-commerce confirma reservas, registra pagos y sincroniza clientes sin intervención manual.
+| # | Problema | Dónde se resuelve | Cómo |
+|---|----------|-------------------|------|
+| 1 | **Agenda sin doble-booking** | **Bookwise App** (Angular) + **Bookwise API** | La app permite a admins/profesionales gestionar calendarios en tiempo real. La API ejecuta la detección de colisiones (`SlotAvailabilityService`), bloquea horarios y previene reservas duplicadas. |
+| 2 | **Packs de sesiones vinculados a reservas** | **Bookwise App** + **WooCommerce** (opcional) + **WordPress Bridge** (opcional) + **Bookwise API** | El cliente puede comprar packs directamente en la Bookwise App o a través de WooCommerce. WooCommerce es un canal de venta independiente — el plugin bridge captura las órdenes y las envía a la API via webhook. En ambos casos, la API crea el `ClientPack` con `PackSessions` individuales y descuenta una al atenderse la cita. |
+| 3 | **Sincronización bidireccional con WooCommerce** | **WordPress Bridge** + **Bookwise API** | El bridge registra webhooks de WooCommerce apuntando a la API. La API procesa órdenes, reembolsos y cambios de cliente a través de `WebhookController` y `WooCommerceCustomerService` — todo verificado via HMAC-SHA256. Sin polling, sin sync manual. |
 
-Esta API es el núcleo que conecta esos tres mundos.
+**Ventas y facturación**: La Bookwise App puede registrar ventas directamente sin necesidad de emitir boletas o facturas. Puede generar un recibo de venta básico para el registro del cliente. La facturación electrónica (DTE — boletas y facturas electrónicas chilenas) está planificada para una versión futura.
+
+**En resumen**: La Bookwise App es la interfaz central donde profesionales y admins gestionan el día a día. La API es el motor que orquesta la agenda, el descuento de sesiones y la sincronización. WooCommerce funciona como un canal de venta opcional conectado a través del plugin bridge.
 
 ### Por qué Laravel
 

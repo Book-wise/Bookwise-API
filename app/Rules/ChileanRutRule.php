@@ -15,18 +15,16 @@ class ChileanRutRule implements ValidationRule
 
         $value = strtoupper(str_replace(['.', '-', ' '], '', trim($value)));
 
-        if (! preg_match('/^\d{1,8}[K0-9]$/', $value)) {
+        if (!preg_match('/^\d{1,8}[K0-9]$/', $value)) {
             $fail('El RUT debe tener formato válido (ej: 12345678-9).');
-
             return;
         }
 
         $rut = substr($value, 0, -1);
-        $dv = substr($value, -1);
+        $dv  = substr($value, -1);
 
-        if (! is_numeric($rut)) {
+        if (!is_numeric($rut)) {
             $fail('El RUT debe tener formato válido (ej: 12345678-9).');
-
             return;
         }
 
@@ -40,6 +38,7 @@ class ChileanRutRule implements ValidationRule
     private function calculateDv(string $rut): string
     {
         $rut = (int) $rut;
+
         $sum = 0;
         $multiplier = 2;
 
@@ -50,12 +49,14 @@ class ChileanRutRule implements ValidationRule
             $multiplier = $multiplier === 7 ? 2 : $multiplier + 1;
         }
 
-        $result = 11 - ($sum % 11);
+        $remainder = $sum % 11;
 
-        return match ($result) {
-            11      => '0',
-            10      => 'K',
-            default => (string) $result,
-        };
+        if ($remainder === 0) {
+            return '0';
+        }
+
+        $dv = 11 - $remainder;
+
+        return $dv === 10 ? 'K' : (string) $dv;
     }
 }
