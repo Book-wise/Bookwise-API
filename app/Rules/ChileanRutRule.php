@@ -40,8 +40,6 @@ class ChileanRutRule implements ValidationRule
     private function calculateDv(string $rut): string
     {
         $rut = (int) $rut;
-        $dv = 11;
-
         $sum = 0;
         $multiplier = 2;
 
@@ -52,12 +50,12 @@ class ChileanRutRule implements ValidationRule
             $multiplier = $multiplier === 7 ? 2 : $multiplier + 1;
         }
 
-        $remainder = $sum % 11;
+        $result = 11 - ($sum % 11);
 
-        if ($remainder === 0) {
-            return '0';
-        }
-
-        return (string) (11 - $remainder);
+        return match ($result) {
+            11      => '0',
+            10      => 'K',
+            default => (string) $result,
+        };
     }
 }
