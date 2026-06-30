@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\V1\BookingResource;
+use App\Mail\BookingConfirmation;
 use App\Models\Booking;
 use App\Models\BookingStatus;
 use App\Models\Provider;
@@ -14,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 
 class BookingController extends Controller
 {
@@ -253,6 +255,11 @@ class BookingController extends Controller
 
         if ($hasIdempotencyKey) {
             $this->idempotency->store($request, $endpoint, 201, ['data' => new BookingResource($booking)]);
+        }
+
+        // Notificación inmediata de cita (solo si el cliente tiene habilitadas las notificaciones)
+        if ($booking->client->notifications_enabled && $booking->client->email) {
+            Mail::to($booking->client->email)->send(new BookingConfirmation($booking));
         }
 
         return response()->json(['data' => new BookingResource($booking)], 201);

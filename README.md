@@ -293,8 +293,30 @@ CORS_ALLOWED_ORIGINS=http://localhost:4200,http://kinesilk.local
 
 Documentación completa de cada endpoint en [Notion](https://www.notion.so/Kinesilk-API-Backend-3593f5a371b981109444db7ebda8e2da).
 
+### Despliegue
+
+Consulta la **[guía completa de deploy → DEPLOY.md](DEPLOY.md)** con instrucciones detalladas para:
+
+| Proveedor | Tipo | Incluye |
+|-----------|------|---------|
+| **HostGator** | cPanel (shared) | Subida de archivos, `.env`, Composer, migraciones, CRON recordatorios ⚠️ |
+| **DigitalOcean** | VPS Ubuntu + Nginx | Stack LEMP, MySQL, SSL Let's Encrypt, SystemD queue worker |
+| **Laravel Cloud** | Serverless | Alternativa zero-maintenance |
+
+> ⚠️ **IMPORTANTE**: Los recordatorios de reserva por email (24h y 30min antes) requieren un CRON en el servidor. Sin él, **no se enviarán**. Ver [DEPLOY.md → Configurar CRON](DEPLOY.md#7-configurar-el-cron-%EF%B8%8F-obligatorio-para-recordatorios).
+
+---
+
+## Documentación relacionada
+
+- [📘 Documentación completa de endpoints (Notion)](https://www.notion.so/Kinesilk-API-Backend-3593f5a371b981109444db7ebda8e2da)
+- [🚀 Guía de deploy](DEPLOY.md) — HostGator, DigitalOcean, configuración SMTP, CRON, SSL
+- [📧 Sistema de notificaciones](DEPLOY.md#7-configurar-el-cron-%EF%B8%8F-obligatorio-para-recordatorios) — 3 tipos de correo: cita inmediata, recordatorio 24h, recordatorio 30min, pago
+
+---
+
 ### Roadmap
 
 - [ ] **Fase 8** — Tests unitarios (SlotAvailabilityService) e integración (BookingController, WebhookController)
-- [ ] **Fase 9** — Deploy HostGator: `.htaccess`, variables en producción, cron jobs
+- [ ] **~~Fase 9 — Deploy~~** ✅ Documentado en [DEPLOY.md](DEPLOY.md)
 - [ ] **Fase 10** — Verificación HTTPS + CORS en producción (`kinesilk.cl`)

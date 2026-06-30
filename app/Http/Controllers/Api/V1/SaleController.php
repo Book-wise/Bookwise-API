@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\V1\SaleResource;
 use App\Http\Resources\V1\SaleTransactionResource;
+use App\Mail\PaymentConfirmation;
 use App\Models\Booking;
 use App\Models\ClientPack;
 use App\Models\Sale;
@@ -13,6 +14,7 @@ use App\Services\IdempotencyService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 
 class SaleController extends Controller
 {
@@ -298,6 +300,12 @@ class SaleController extends Controller
                 'data' => new SaleTransactionResource($result['transaction']),
                 'sale' => $result['sale'],
             ]);
+        }
+
+        // Notificación de pago (solo si el cliente tiene habilitadas las notificaciones)
+        $sale = Sale::with('client')->find($id);
+        if ($sale && $sale->client?->notifications_enabled && $sale->client->email) {
+            Mail::to($sale->client->email)->send(new PaymentConfirmation($sale, (float) $validated['amount']));
         }
 
         return response()->json([
