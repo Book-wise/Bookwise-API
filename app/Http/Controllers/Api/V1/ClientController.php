@@ -43,6 +43,7 @@ class ClientController extends Controller
                 ->orWhere('email', 'like', "%{$request->search}%")
                 ->orWhere('phone', 'like', "%{$request->search}%")
             )
+            ->when($request->rut, fn ($q) => $q->where('rut', $request->rut))
             ->when($request->active !== null, fn ($q) => $q->where('active', filter_var($request->active, FILTER_VALIDATE_BOOLEAN)))
             ->when($request->wc_customer_id, fn ($q) => $q->where('wc_customer_id', $request->wc_customer_id))
             ->orderBy('first_name')
