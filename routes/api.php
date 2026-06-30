@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\BlockedSlotController;
 use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\ClientController;
 use App\Http\Controllers\Api\V1\ClientPackController;
+use App\Http\Controllers\Api\V1\AgentController;
 use App\Http\Controllers\Api\V1\CustomAttributeController;
 use App\Http\Controllers\Api\V1\LocationController;
 use App\Http\Controllers\Api\V1\PackSessionController;
@@ -120,4 +121,8 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
 
     // Me
     Route::get('/me', [ClientController::class, 'me'])->middleware('scope:clients:read');
+
+    // Agente conversacional
+    Route::get('/agent/check-availability', [AgentController::class, 'checkAvailability'])
+        ->middleware('scope:bookings:read');
 });
