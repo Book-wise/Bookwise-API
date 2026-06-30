@@ -8,6 +8,7 @@ enum UserRole: string
     case PROVIDER = 'provider';
     case CLIENT = 'client';
     case WOOCOMMERCE = 'woocommerce';
+    case AGENT       = 'agent';
 
     /**
      * Sanctum token abilities assigned on login for each role.
@@ -21,6 +22,7 @@ enum UserRole: string
             self::PROVIDER => ['bookings:read', 'bookings:write', 'clients:read'],
             self::WOOCOMMERCE => ['clients:read', 'clients:write', 'bookings:read', 'bookings:write'],
             self::CLIENT => ['clients:read'],
+            self::AGENT => ['bookings:read', 'clients:read', 'clients:write', 'providers:read'],
         };
     }
 }
