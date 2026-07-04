@@ -1,12 +1,12 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AgentController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\AvailableSlotsController;
 use App\Http\Controllers\Api\V1\BlockedSlotController;
 use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\ClientController;
 use App\Http\Controllers\Api\V1\ClientPackController;
-use App\Http\Controllers\Api\V1\AgentController;
 use App\Http\Controllers\Api\V1\CustomAttributeController;
 use App\Http\Controllers\Api\V1\LocationController;
 use App\Http\Controllers\Api\V1\PackSessionController;

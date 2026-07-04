@@ -8,7 +8,7 @@ enum UserRole: string
     case PROVIDER = 'provider';
     case CLIENT = 'client';
     case WOOCOMMERCE = 'woocommerce';
-    case AGENT       = 'agent';
+    case AGENT = 'agent';
 
     /**
      * Sanctum token abilities assigned on login for each role.
