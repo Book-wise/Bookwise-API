@@ -11,6 +11,7 @@ use App\Services\BookingService;
 use App\Services\ClientService;
 use App\Services\SaleService;
 use App\Services\WooCommerceCustomerService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -147,7 +148,8 @@ class WebhookController extends Controller
             if (! $available) {
                 $log->update([
                     'status' => 'failed',
-                    'error_message' => 'Slot unavailable for location '.$meta['location_id'],
+                    'error_message' => 'Slot unavailable for location '.$meta['location_id']
+                        .' from '.$meta['slot_start'].' to '.$meta['slot_end'],
                 ]);
 
                 return response()->json([
@@ -159,7 +161,20 @@ class WebhookController extends Controller
             // Steps 6-7: Create booking, sale, and transaction atomically
             $confirmedStatus = BookingStatus::where('is_cancellation', false)->first();
 
-            $result = DB::transaction(function () use ($data, $orderId, $client, $meta, $confirmedStatus, $log) {
+            if ($confirmedStatus === null) {
+                $log->update([
+                    'status' => 'failed',
+                    'error_message' => 'No non-cancellation booking status configured',
+                ]);
+
+                return response()->json(['error' => 'configuration_error'], 500);
+            }
+
+            $paidAt = isset($data['date_paid'])
+                ? Carbon::parse($data['date_paid'])
+                : now();
+
+            $result = DB::transaction(function () use ($data, $orderId, $client, $meta, $confirmedStatus, $log, $paidAt) {
                 $booking = $this->bookingService->findOrCreateBooking([
                     'wc_order_id' => $orderId,
                     'client_id' => $client->id,
@@ -174,19 +189,17 @@ class WebhookController extends Controller
                 ]);
 
                 // Add status history for newly created booking
-                if ($confirmedStatus) {
-                    $booking->statusHistory()->create([
-                        'status_id' => $confirmedStatus->id,
-                        'notes' => 'Confirmed via WooCommerce order #'.$orderId,
-                    ]);
-                }
+                $booking->statusHistory()->create([
+                    'status_id' => $confirmedStatus->id,
+                    'notes' => 'Confirmed via WooCommerce order #'.$orderId,
+                ]);
 
                 // Step 7: Create sale and transaction
                 $sale = $this->saleService->createFromBooking($booking, [
                     'wc_order_id' => $orderId,
                     'total' => $data['total'] ?? $booking->price,
                     'payment_method' => $data['payment_method'] ?? 'online',
-                    'paid_at' => $data['date_paid'] ?? now(),
+                    'paid_at' => $paidAt,
                 ]);
 
                 $log->update(['status' => 'processed']);
