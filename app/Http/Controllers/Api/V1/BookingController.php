@@ -6,11 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\V1\BookingResource;
 use App\Models\Booking;
 use App\Models\BookingStatus;
-use App\Models\Service;
 use App\Models\Location;
+use App\Models\Service;
 use Carbon\Carbon;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class BookingController extends Controller
 {
@@ -28,14 +28,14 @@ class BookingController extends Controller
                     $query->whereIn('location_id', $locationIds);
                 }
             })
-            ->when($request->client_id,   fn($q) => $q->where('client_id',   $request->client_id))
-            ->when($request->service_id,  fn($q) => $q->where('service_id',  $request->service_id))
-            ->when($request->provider_id, fn($q) => $q->where('provider_id', $request->provider_id))
-            ->when($request->location_id, fn($q) => $q->where('location_id', $request->location_id))
-            ->when($request->status_id,   fn($q) => $q->where('status_id',   $request->status_id))
-            ->when($request->date_from,   fn($q) => $q->whereDate('start_time', '>=', $request->date_from))
-            ->when($request->date_to,     fn($q) => $q->whereDate('start_time', '<=', $request->date_to))
-            ->when($request->wc_order_id, fn($q) => $q->where('wc_order_id', $request->wc_order_id))
+            ->when($request->client_id, fn ($q) => $q->where('client_id', $request->client_id))
+            ->when($request->service_id, fn ($q) => $q->where('service_id', $request->service_id))
+            ->when($request->provider_id, fn ($q) => $q->where('provider_id', $request->provider_id))
+            ->when($request->location_id, fn ($q) => $q->where('location_id', $request->location_id))
+            ->when($request->status_id, fn ($q) => $q->where('status_id', $request->status_id))
+            ->when($request->date_from, fn ($q) => $q->whereDate('start_time', '>=', $request->date_from))
+            ->when($request->date_to, fn ($q) => $q->whereDate('start_time', '<=', $request->date_to))
+            ->when($request->wc_order_id, fn ($q) => $q->where('wc_order_id', $request->wc_order_id))
             ->orderBy('start_time', 'desc')
             ->paginate($request->per_page ?? 15);
 
@@ -55,20 +55,20 @@ class BookingController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'start_time'       => ['required', 'date', 'after:now'],
-            'end_time'         => ['nullable', 'date', 'after:start_time'],
-            'service_id'       => ['required', 'integer', 'exists:services,id'],
-            'provider_id'      => ['nullable', 'integer', 'exists:providers,id'],
-            'client_id'        => ['required', 'integer', 'exists:clients,id'],
-            'location_id'      => ['required', 'integer', 'exists:locations,id'],
-            'status_id'        => ['required', 'integer', 'exists:booking_statuses,id'],
-            'price'            => ['nullable', 'numeric', 'min:0'],
-            'notes'            => ['nullable', 'string', 'max:1000'],
+            'start_time' => ['required', 'date', 'after:now'],
+            'end_time' => ['nullable', 'date', 'after:start_time'],
+            'service_id' => ['required', 'integer', 'exists:services,id'],
+            'provider_id' => ['nullable', 'integer', 'exists:providers,id'],
+            'client_id' => ['required', 'integer', 'exists:clients,id'],
+            'location_id' => ['required', 'integer', 'exists:locations,id'],
+            'status_id' => ['required', 'integer', 'exists:booking_statuses,id'],
+            'price' => ['nullable', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string', 'max:1000'],
             'duration_minutes' => ['nullable', 'integer', 'min:15', 'max:480'],
-            'wc_order_id'      => ['nullable', 'integer'],
+            'wc_order_id' => ['nullable', 'integer'],
         ]);
 
-        $service   = Service::findOrFail($validated['service_id']);
+        $service = Service::findOrFail($validated['service_id']);
         $startTime = Carbon::parse($validated['start_time']);
 
         // Duración efectiva — CHG-001
@@ -94,21 +94,21 @@ class BookingController extends Controller
                 : 'Client overlap with existing booking';
 
             return response()->json([
-                'error'       => 'conflict',
-                'detail'     => $conflictType,
+                'error' => 'conflict',
+                'detail' => $conflictType,
                 'conflicts_with' => [
-                    'id'        => $conflict->id,
+                    'id' => $conflict->id,
                     'start_time' => $conflict->start_time->toIso8601String(),
-                    'end_time'   => $conflict->end_time->toIso8601String(),
+                    'end_time' => $conflict->end_time->toIso8601String(),
                 ],
             ], 409);
         }
 
         $booking = Booking::create([
             ...$validated,
-            'end_time'                => $endTime,
+            'end_time' => $endTime,
             'custom_duration_minutes' => $validated['duration_minutes'] ?? null,
-            'price'                   => $validated['price'] ?? $service->price,
+            'price' => $validated['price'] ?? $service->price,
         ]);
 
         $booking->load(['client', 'service', 'provider', 'location', 'status']);
@@ -122,11 +122,11 @@ class BookingController extends Controller
         $booking = Booking::findOrFail($id);
 
         $validated = $request->validate([
-            'start_time'  => ['sometimes', 'date', 'after:now'],
-            'end_time'    => ['sometimes', 'date', 'after:start_time'],
-            'status_id'   => ['sometimes', 'integer', 'exists:booking_statuses,id'],
-            'price'       => ['sometimes', 'numeric', 'min:0'],
-            'notes'       => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'start_time' => ['sometimes', 'date', 'after:now'],
+            'end_time' => ['sometimes', 'date', 'after:start_time'],
+            'status_id' => ['sometimes', 'integer', 'exists:booking_statuses,id'],
+            'price' => ['sometimes', 'numeric', 'min:0'],
+            'notes' => ['sometimes', 'nullable', 'string', 'max:1000'],
             'provider_id' => ['sometimes', 'nullable', 'integer', 'exists:providers,id'],
         ]);
 
@@ -164,12 +164,12 @@ class BookingController extends Controller
                     : 'Client overlap with existing booking';
 
                 return response()->json([
-                    'error'       => 'conflict',
-                    'detail'     => $conflictType,
+                    'error' => 'conflict',
+                    'detail' => $conflictType,
                     'conflicts_with' => [
-                        'id'        => $conflict->id,
+                        'id' => $conflict->id,
                         'start_time' => $conflict->start_time->toIso8601String(),
-                        'end_time'   => $conflict->end_time->toIso8601String(),
+                        'end_time' => $conflict->end_time->toIso8601String(),
                     ],
                 ], 409);
             }
@@ -191,7 +191,7 @@ class BookingController extends Controller
         // Ya está cancelada
         if ($booking->status_id === $cancelStatus->id) {
             return response()->json([
-                'error'  => 'already_cancelled',
+                'error' => 'already_cancelled',
                 'detail' => 'This booking is already cancelled.',
             ], 422);
         }
@@ -201,7 +201,7 @@ class BookingController extends Controller
         // Registrar en historial
         $booking->statusHistory()->create([
             'status_id' => $cancelStatus->id,
-            'notes'     => $request->input('notes', 'Cancelled via API'),
+            'notes' => $request->input('notes', 'Cancelled via API'),
         ]);
 
         $booking->load(['client', 'service', 'provider', 'location', 'status']);
@@ -213,11 +213,7 @@ class BookingController extends Controller
     /**
      * Check if there are any overlapping bookings (location or client).
      *
-     * @param int $locationId
-     * @param int $clientId
-     * @param Carbon $startTime
-     * @param Carbon $endTime
-     * @param int|null $excludeBookingId Booking ID to exclude from the search
+     * @param  int|null  $excludeBookingId  Booking ID to exclude from the search
      * @return Booking|null The conflicting booking, or null if no conflict
      */
     private function checkBookingOverlap(

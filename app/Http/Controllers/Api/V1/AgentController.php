@@ -18,19 +18,19 @@ class AgentController extends Controller
     {
         $validated = $request->validate([
             'service_id' => ['required', 'integer', 'exists:services,id'],
-            'date'       => ['required', 'date_format:Y-m-d'],
-            'time'       => ['required', 'date_format:H:i'],
+            'date' => ['required', 'date_format:Y-m-d'],
+            'time' => ['required', 'date_format:H:i'],
         ]);
 
-        $service  = Service::findOrFail($validated['service_id']);
+        $service = Service::findOrFail($validated['service_id']);
         $duration = $service->effective_duration_minutes;
 
         $start = Carbon::parse("{$validated['date']} {$validated['time']}");
-        $end   = $start->copy()->addMinutes($duration);
+        $end = $start->copy()->addMinutes($duration);
 
         $providers = Provider::with('location')
             ->where('active', true)
-            ->whereHas('services', fn($q) => $q->where('services.id', $service->id))
+            ->whereHas('services', fn ($q) => $q->where('services.id', $service->id))
             ->get();
 
         $slots = collect();
@@ -38,12 +38,12 @@ class AgentController extends Controller
         foreach ($providers as $provider) {
             $location = $provider->location;
 
-            if (!$location || !$location->active) {
+            if (! $location || ! $location->active) {
                 continue;
             }
 
-            $opening = Carbon::parse($validated['date'] . ' ' . ($location->opening_time ?? '09:00:00'));
-            $closing = Carbon::parse($validated['date'] . ' ' . ($location->closing_time ?? '19:00:00'));
+            $opening = Carbon::parse($validated['date'].' '.($location->opening_time ?? '09:00:00'));
+            $closing = Carbon::parse($validated['date'].' '.($location->closing_time ?? '19:00:00'));
 
             if ($start->lt($opening) || $end->gt($closing)) {
                 continue;
@@ -60,16 +60,16 @@ class AgentController extends Controller
             }
 
             $slots->push([
-                'provider'   => $provider,
-                'location'   => $location,
+                'provider' => $provider,
+                'location' => $location,
                 'start_time' => $start->toIso8601String(),
-                'end_time'   => $end->toIso8601String(),
+                'end_time' => $end->toIso8601String(),
             ]);
         }
 
         return response()->json([
             'available' => $slots->isNotEmpty(),
-            'slots'     => AgentAvailabilitySlotResource::collection($slots),
+            'slots' => AgentAvailabilitySlotResource::collection($slots),
         ]);
     }
 }
