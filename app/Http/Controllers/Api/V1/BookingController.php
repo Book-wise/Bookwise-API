@@ -6,28 +6,34 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\V1\BookingResource;
 use App\Models\Booking;
 use App\Models\BookingStatus;
+use App\Models\BlockedSlot;
+use App\Models\Client;
 use App\Models\Location;
+use App\Models\Provider;
 use App\Models\Service;
+use App\Policies\BookingPolicy;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class BookingController extends Controller
 {
+    public function __construct(
+        private readonly BookingPolicy $bookingPolicy,
+    ) {}
+
     // ── GET /v1/bookings ───────────────────────────────────────────
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
 
-        $bookings = Booking::with(['client', 'service', 'provider', 'location', 'status', 'sale', 'packSession.clientPack'])
-            // Provider filter: only show bookings for their locations
-            ->when($user?->role?->value === 'provider', function ($query) use ($user) {
-                $provider = $user->provider;
-                if ($provider) {
-                    $locationIds = $provider->locations->pluck('id')->toArray();
-                    $query->whereIn('location_id', $locationIds);
-                }
-            })
+        $this->authorize('viewAny', Booking::class);
+
+        $bookings = $this->bookingPolicy->scopeVisibleTo(
+            Booking::with(['client', 'service', 'provider', 'location', 'status', 'sale', 'packSession.clientPack']),
+            $user,
+        )
             ->when($request->client_id, fn ($q) => $q->where('client_id', $request->client_id))
             ->when($request->service_id, fn ($q) => $q->where('service_id', $request->service_id))
             ->when($request->provider_id, fn ($q) => $q->where('provider_id', $request->provider_id))
@@ -43,10 +49,12 @@ class BookingController extends Controller
     }
 
     // ── GET /v1/bookings/{id} ──────────────────────────────────────
-    public function show(int $id): JsonResponse
+    public function show(Request $request, int $id): JsonResponse
     {
         $booking = Booking::with(['client', 'service', 'provider', 'location', 'status', 'statusHistory.status', 'sale', 'packSession.clientPack'])
             ->findOrFail($id);
+
+        $this->authorize('view', $booking);
 
         return response()->json(['data' => new BookingResource($booking)]);
     }
@@ -69,6 +77,8 @@ class BookingController extends Controller
         ]);
 
         $service = Service::findOrFail($validated['service_id']);
+        $location = Location::findOrFail($validated['location_id']);
+        $this->authorize('create', [Booking::class, $location]);
         $startTime = Carbon::parse($validated['start_time']);
 
         // Duración efectiva — CHG-001
@@ -80,36 +90,38 @@ class BookingController extends Controller
             ? Carbon::parse($validated['end_time'])
             : $startTime->copy()->addMinutes($effectiveDuration);
 
-        // Check for booking overlaps (location or client)
-        $conflict = $this->checkBookingOverlap(
-            $validated['location_id'],
-            $validated['client_id'],
-            $startTime,
-            $endTime
-        );
+        $result = DB::transaction(function () use ($validated, $startTime, $endTime, $service): array {
+            $this->lockSchedulingResources(
+                $validated['location_id'],
+                $validated['client_id'],
+                $validated['provider_id'] ?? null,
+            );
 
-        if ($conflict) {
-            $conflictType = $conflict->location_id === (int) $validated['location_id']
-                ? 'Location overlap with existing booking'
-                : 'Client overlap with existing booking';
+            $conflict = $this->findSchedulingConflict(
+                $validated['location_id'],
+                $validated['client_id'],
+                $validated['provider_id'] ?? null,
+                $startTime,
+                $endTime,
+            );
 
-            return response()->json([
-                'error' => 'conflict',
-                'detail' => $conflictType,
-                'conflicts_with' => [
-                    'id' => $conflict->id,
-                    'start_time' => $conflict->start_time->toIso8601String(),
-                    'end_time' => $conflict->end_time->toIso8601String(),
-                ],
-            ], 409);
+            if ($conflict !== null) {
+                return ['conflict' => $conflict];
+            }
+
+            return ['booking' => Booking::create([
+                ...$validated,
+                'end_time' => $endTime,
+                'custom_duration_minutes' => $validated['duration_minutes'] ?? null,
+                'price' => $validated['price'] ?? $service->price,
+            ])];
+        }, 3);
+
+        if (isset($result['conflict'])) {
+            return $this->conflictResponse($result['conflict']);
         }
 
-        $booking = Booking::create([
-            ...$validated,
-            'end_time' => $endTime,
-            'custom_duration_minutes' => $validated['duration_minutes'] ?? null,
-            'price' => $validated['price'] ?? $service->price,
-        ]);
+        $booking = $result['booking'];
 
         $booking->load(['client', 'service', 'provider', 'location', 'status']);
 
@@ -120,6 +132,7 @@ class BookingController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $booking = Booking::findOrFail($id);
+        $this->authorize('update', $booking);
 
         $validated = $request->validate([
             'start_time' => ['sometimes', 'date', 'after:now'],
@@ -130,52 +143,48 @@ class BookingController extends Controller
             'provider_id' => ['sometimes', 'nullable', 'integer', 'exists:providers,id'],
         ]);
 
-        // Check for booking overlaps if time, location, or client is being changed
-        if (isset($validated['start_time']) || isset($validated['end_time'])
-            || isset($validated['location_id']) || isset($validated['client_id'])) {
-
-            $startTime = isset($validated['start_time'])
-                ? Carbon::parse($validated['start_time'])
-                : $booking->start_time;
-
+        $result = DB::transaction(function () use ($booking, $validated): array {
+            $lockedBooking = Booking::whereKey($booking->id)->lockForUpdate()->firstOrFail();
+            $startTime = isset($validated['start_time']) ? Carbon::parse($validated['start_time']) : $lockedBooking->start_time;
             $endTime = isset($validated['end_time'])
                 ? Carbon::parse($validated['end_time'])
-                : ($booking->end_time ?? $startTime->copy()->addMinutes($booking->effective_duration_minutes));
+                : ($lockedBooking->end_time ?? $startTime->copy()->addMinutes($lockedBooking->effective_duration_minutes));
 
-            $locationId = isset($validated['location_id'])
-                ? $validated['location_id']
-                : $booking->location_id;
-
-            $clientId = isset($validated['client_id'])
-                ? $validated['client_id']
-                : $booking->client_id;
-
-            $conflict = $this->checkBookingOverlap(
-                $locationId,
-                $clientId,
-                $startTime,
-                $endTime,
-                $booking->id
+            $this->lockSchedulingResources(
+                $lockedBooking->location_id,
+                $lockedBooking->client_id,
+                $validated['provider_id'] ?? $lockedBooking->provider_id,
             );
 
-            if ($conflict) {
-                $conflictType = $conflict->location_id === $locationId
-                    ? 'Location overlap with existing booking'
-                    : 'Client overlap with existing booking';
+            if (isset($validated['start_time']) || isset($validated['end_time']) || isset($validated['provider_id'])) {
+                $conflict = $this->findSchedulingConflict(
+                    $lockedBooking->location_id,
+                    $lockedBooking->client_id,
+                    $validated['provider_id'] ?? $lockedBooking->provider_id,
+                    $startTime,
+                    $endTime,
+                    $lockedBooking->id,
+                );
 
-                return response()->json([
-                    'error' => 'conflict',
-                    'detail' => $conflictType,
-                    'conflicts_with' => [
-                        'id' => $conflict->id,
-                        'start_time' => $conflict->start_time->toIso8601String(),
-                        'end_time' => $conflict->end_time->toIso8601String(),
-                    ],
-                ], 409);
+                if ($conflict !== null) {
+                    return ['conflict' => $conflict];
+                }
             }
+
+            if (isset($validated['start_time']) && ! isset($validated['end_time'])) {
+                $validated['end_time'] = $endTime;
+            }
+
+            $lockedBooking->update($validated);
+
+            return ['booking' => $lockedBooking];
+        }, 3);
+
+        if (isset($result['conflict'])) {
+            return $this->conflictResponse($result['conflict']);
         }
 
-        $booking->update($validated);
+        $booking = $result['booking'];
         $booking->load(['client', 'service', 'provider', 'location', 'status']);
 
         return response()->json(['data' => new BookingResource($booking)]);
@@ -185,60 +194,118 @@ class BookingController extends Controller
     public function cancel(Request $request, int $id): JsonResponse
     {
         $booking = Booking::findOrFail($id);
+        $this->authorize('cancel', $booking);
 
         $cancelStatus = BookingStatus::where('is_cancellation', true)->firstOrFail();
 
-        // Ya está cancelada
-        if ($booking->status_id === $cancelStatus->id) {
+        $cancelled = DB::transaction(function () use ($booking, $cancelStatus, $request): bool {
+            $lockedBooking = Booking::whereKey($booking->id)->lockForUpdate()->firstOrFail();
+
+            if ($lockedBooking->status_id === $cancelStatus->id) {
+                return false;
+            }
+
+            $lockedBooking->update(['status_id' => $cancelStatus->id]);
+            $lockedBooking->statusHistory()->create([
+                'status_id' => $cancelStatus->id,
+                'notes' => $request->input('notes', 'Cancelled via API'),
+            ]);
+
+            return true;
+        }, 3);
+
+        if (! $cancelled) {
             return response()->json([
                 'error' => 'already_cancelled',
                 'detail' => 'This booking is already cancelled.',
             ], 422);
         }
 
-        $booking->update(['status_id' => $cancelStatus->id]);
-
-        // Registrar en historial
-        $booking->statusHistory()->create([
-            'status_id' => $cancelStatus->id,
-            'notes' => $request->input('notes', 'Cancelled via API'),
-        ]);
-
         $booking->load(['client', 'service', 'provider', 'location', 'status']);
 
         return response()->json(['data' => new BookingResource($booking)]);
     }
 
-    // ── Private: Check for booking overlaps ───────────────────────────
-    /**
-     * Check if there are any overlapping bookings (location or client).
-     *
-     * @param  int|null  $excludeBookingId  Booking ID to exclude from the search
-     * @return Booking|null The conflicting booking, or null if no conflict
-     */
-    private function checkBookingOverlap(
+    /** @return array{type: string, booking?: Booking, blocked_slot?: BlockedSlot}|null */
+    private function findSchedulingConflict(
         int $locationId,
         int $clientId,
+        ?int $providerId,
         Carbon $startTime,
         Carbon $endTime,
         ?int $excludeBookingId = null
-    ): ?Booking {
-        // Check location overlap
+    ): ?array {
         $locationConflict = Booking::where('location_id', $locationId)
             ->active()
             ->overlapping($startTime, $endTime, $excludeBookingId)
             ->first();
 
         if ($locationConflict) {
-            return $locationConflict;
+            return ['type' => 'location_booking', 'booking' => $locationConflict];
         }
 
-        // Check client overlap
         $clientConflict = Booking::where('client_id', $clientId)
             ->active()
             ->overlapping($startTime, $endTime, $excludeBookingId)
             ->first();
 
-        return $clientConflict;
+        if ($clientConflict) {
+            return ['type' => 'client_booking', 'booking' => $clientConflict];
+        }
+
+        $blockedSlot = BlockedSlot::where('location_id', $locationId)
+            ->when($providerId !== null, function ($query) use ($providerId) {
+                $query->where(function ($query) use ($providerId) {
+                    $query->whereNull('provider_id')->orWhere('provider_id', $providerId);
+                });
+            })
+            ->where('start_time', '<', $endTime)
+            ->where('end_time', '>', $startTime)
+            ->first();
+
+        return $blockedSlot ? ['type' => 'blocked_slot', 'blocked_slot' => $blockedSlot] : null;
+    }
+
+    private function lockSchedulingResources(int $locationId, int $clientId, ?int $providerId): void
+    {
+        Location::whereKey($locationId)->lockForUpdate()->firstOrFail();
+        Client::whereKey($clientId)->lockForUpdate()->firstOrFail();
+
+        if ($providerId !== null) {
+            Provider::whereKey($providerId)->lockForUpdate()->firstOrFail();
+        }
+    }
+
+    /** @param array{type: string, booking?: Booking, blocked_slot?: BlockedSlot} $conflict */
+    private function conflictResponse(array $conflict): JsonResponse
+    {
+        if ($conflict['type'] === 'blocked_slot') {
+            $blockedSlot = $conflict['blocked_slot'];
+
+            return response()->json([
+                'error' => 'conflict',
+                'detail' => 'Agenda block overlap',
+                'conflicts_with' => [
+                    'id' => $blockedSlot->id,
+                    'start_time' => $blockedSlot->start_time->toIso8601String(),
+                    'end_time' => $blockedSlot->end_time->toIso8601String(),
+                    'type' => 'blocked_slot',
+                ],
+            ], 409);
+        }
+
+        $booking = $conflict['booking'];
+
+        return response()->json([
+            'error' => 'conflict',
+            'detail' => $conflict['type'] === 'location_booking'
+                ? 'Location overlap with existing booking'
+                : 'Client overlap with existing booking',
+            'conflicts_with' => [
+                'id' => $booking->id,
+                'start_time' => $booking->start_time->toIso8601String(),
+                'end_time' => $booking->end_time->toIso8601String(),
+            ],
+        ], 409);
     }
 }

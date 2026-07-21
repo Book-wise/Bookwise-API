@@ -26,4 +26,17 @@ class ServiceController extends Controller
 
         return response()->json(['data' => new ServiceResource($service)]);
     }
+
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'price' => ['required', 'numeric', 'min:0'],
+            'duration_minutes' => ['required', 'integer', 'min:15', 'max:480'],
+        ]);
+
+        $service = Service::create($validated);
+
+        return response()->json(['data' => new ServiceResource($service)], 201);
+    }
 }

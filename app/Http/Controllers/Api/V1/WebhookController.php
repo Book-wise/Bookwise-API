@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\BookingStatus;
+use App\Models\Location;
 use App\Models\Sale;
 use App\Models\WoocommerceWebhooksLog;
 use App\Services\BookingService;
@@ -28,6 +29,14 @@ class WebhookController extends Controller
     public function handle(Request $request): JsonResponse
     {
         $secret = config('services.woocommerce.webhook_secret');
+
+        if (! is_string($secret) || trim($secret) === '') {
+            return response()->json([
+                'error' => 'configuration_error',
+                'detail' => 'WooCommerce webhook secret is not configured.',
+            ], 503);
+        }
+
         $payload = $request->getContent();
         $signature = $request->header('X-WC-Webhook-Signature');
         $expected = base64_encode(hash_hmac('sha256', $payload, $secret, true));
@@ -37,6 +46,10 @@ class WebhookController extends Controller
         }
 
         $data = json_decode($payload, true);
+        if (! is_array($data)) {
+            return response()->json(['error' => 'invalid_payload'], 400);
+        }
+
         $event = $request->header('X-WC-Webhook-Topic', 'unknown');
 
         // Check for customer events first
@@ -52,7 +65,7 @@ class WebhookController extends Controller
             'wc_order_id' => $orderId,
             'wc_entity_id' => $orderId,
             'entity_type' => 'order',
-            'payload' => $payload,
+            'payload' => $this->sanitizePayload($data, $event),
             'status' => 'received',
         ]);
 
@@ -81,7 +94,7 @@ class WebhookController extends Controller
             'event' => $event,
             'wc_entity_id' => $customerId,
             'entity_type' => 'customer',
-            'payload' => json_encode($data),
+            'payload' => $this->sanitizePayload($data, $event),
             'status' => 'received',
         ]);
 
@@ -123,42 +136,6 @@ class WebhookController extends Controller
             // Step 3: Sync / create client
             $client = $this->clientService->syncFromWooCommerce($billing);
 
-            // Step 4: Check idempotency — existing booking with this wc_order_id
-            $existingBooking = Booking::where('wc_order_id', $orderId)->first();
-
-            if ($existingBooking) {
-                $existingSale = Sale::where('wc_order_id', $orderId)->first();
-
-                $log->update(['status' => 'processed']);
-
-                return response()->json([
-                    'booking_id' => $existingBooking->id,
-                    'sale_id' => $existingSale?->id,
-                    'client_id' => $client->id,
-                ], 200);
-            }
-
-            // Step 5: Verify slot availability
-            $available = $this->bookingService->verifyAvailability(
-                $meta['location_id'],
-                $meta['slot_start'],
-                $meta['slot_end'],
-            );
-
-            if (! $available) {
-                $log->update([
-                    'status' => 'failed',
-                    'error_message' => 'Slot unavailable for location '.$meta['location_id']
-                        .' from '.$meta['slot_start'].' to '.$meta['slot_end'],
-                ]);
-
-                return response()->json([
-                    'error' => 'slot_unavailable',
-                    'detail' => 'The requested time slot is no longer available.',
-                ], 409);
-            }
-
-            // Steps 6-7: Create booking, sale, and transaction atomically
             $confirmedStatus = BookingStatus::where('is_cancellation', false)->first();
 
             if ($confirmedStatus === null) {
@@ -174,7 +151,27 @@ class WebhookController extends Controller
                 ? Carbon::parse($data['date_paid'])
                 : now();
 
-            $result = DB::transaction(function () use ($data, $orderId, $client, $meta, $confirmedStatus, $log, $paidAt) {
+            $result = DB::transaction(function () use ($data, $orderId, $client, $meta, $confirmedStatus, $paidAt): array {
+                Location::whereKey($meta['location_id'])->lockForUpdate()->firstOrFail();
+
+                $existingBooking = Booking::where('wc_order_id', $orderId)->lockForUpdate()->first();
+                if ($existingBooking) {
+                    return [
+                        'status' => 'existing',
+                        'booking_id' => $existingBooking->id,
+                        'sale_id' => Sale::where('wc_order_id', $orderId)->value('id'),
+                        'client_id' => $client->id,
+                    ];
+                }
+
+                if (! $this->bookingService->verifyAvailability(
+                    $meta['location_id'],
+                    $meta['slot_start'],
+                    $meta['slot_end'],
+                )) {
+                    return ['status' => 'slot_unavailable'];
+                }
+
                 $booking = $this->bookingService->findOrCreateBooking([
                     'wc_order_id' => $orderId,
                     'client_id' => $client->id,
@@ -202,14 +199,29 @@ class WebhookController extends Controller
                     'paid_at' => $paidAt,
                 ]);
 
-                $log->update(['status' => 'processed']);
-
                 return [
+                    'status' => 'created',
                     'booking_id' => $booking->id,
                     'sale_id' => $sale->id,
                     'client_id' => $client->id,
                 ];
             });
+
+            if ($result['status'] === 'slot_unavailable') {
+                $log->update([
+                    'status' => 'failed',
+                    'error_message' => 'Slot unavailable for location '.$meta['location_id']
+                        .' from '.$meta['slot_start'].' to '.$meta['slot_end'],
+                ]);
+
+                return response()->json([
+                    'error' => 'slot_unavailable',
+                    'detail' => 'The requested time slot is no longer available.',
+                ], 409);
+            }
+
+            $log->update(['status' => 'processed']);
+            unset($result['status']);
 
             return response()->json($result, 200);
         } catch (\Throwable $e) {
@@ -219,27 +231,83 @@ class WebhookController extends Controller
         }
     }
 
-    private function handleOrderRefunded(array $data, $log): void
+    private function handleOrderRefunded(array $data, WoocommerceWebhooksLog $log): void
     {
         $orderId = $data['id'] ?? null;
-        $booking = Booking::where('wc_order_id', $orderId)->first();
 
-        if (! $booking) {
-            $log->update(['status' => 'processed']);
+        DB::transaction(function () use ($orderId): void {
+            $booking = Booking::where('wc_order_id', $orderId)->lockForUpdate()->first();
+            if (! $booking) {
+                return;
+            }
 
-            return;
-        }
+            $cancelStatus = BookingStatus::where('is_cancellation', true)->first();
+            if ($cancelStatus && $booking->status_id !== $cancelStatus->id) {
+                $booking->update(['status_id' => $cancelStatus->id]);
+                $booking->statusHistory()->create([
+                    'status_id' => $cancelStatus->id,
+                    'notes' => 'Cancelled via WooCommerce refund order #'.$orderId,
+                ]);
+            }
+        }, 3);
 
-        $cancelStatus = BookingStatus::where('is_cancellation', true)->first();
-        if ($cancelStatus) {
-            $booking->update(['status_id' => $cancelStatus->id]);
-            $booking->statusHistory()->create([
-                'status_id' => $cancelStatus->id,
-                'notes' => 'Cancelled via WooCommerce refund order #'.$orderId,
-            ]);
-        }
+        $log->update([
+            'status' => 'processed',
+            'payload' => [
+                ...$this->sanitizePayload($data, 'order.refunded'),
+                'financial_reconciliation' => 'pending',
+            ],
+        ]);
+    }
 
-        $log->update(['status' => 'processed']);
+    /**
+     * Keep technical delivery evidence without storing billing or shipping personal data.
+     *
+     * @return array<string, mixed>
+     */
+    private function sanitizePayload(array $data, string $event): array
+    {
+        $allowedMetaKeys = [
+            '_kinesilk_slot_start',
+            '_kinesilk_slot_end',
+            '_kinesilk_location_id',
+            '_kinesilk_service_id',
+            '_kinesilk_duration_minutes',
+        ];
+
+        $lineItems = collect($data['line_items'] ?? [])
+            ->map(function (array $item) use ($allowedMetaKeys): array {
+                return array_filter([
+                    'id' => $item['id'] ?? null,
+                    'product_id' => $item['product_id'] ?? null,
+                    'variation_id' => $item['variation_id'] ?? null,
+                    'meta_data' => collect($item['meta_data'] ?? [])
+                        ->filter(fn (array $meta): bool => in_array($meta['key'] ?? null, $allowedMetaKeys, true))
+                        ->map(fn (array $meta): array => [
+                            'key' => $meta['key'],
+                            'value' => $meta['value'] ?? null,
+                        ])
+                        ->values()
+                        ->all(),
+                ], fn ($value): bool => $value !== null);
+            })
+            ->values()
+            ->all();
+
+        return array_filter([
+            'topic' => $event,
+            'id' => $data['id'] ?? null,
+            'parent_id' => $data['parent_id'] ?? null,
+            'customer_id' => $data['customer_id'] ?? null,
+            'status' => $data['status'] ?? null,
+            'currency' => $data['currency'] ?? null,
+            'total' => $data['total'] ?? null,
+            'date_created' => $data['date_created'] ?? null,
+            'date_modified' => $data['date_modified'] ?? null,
+            'date_paid' => $data['date_paid'] ?? null,
+            'date_completed' => $data['date_completed'] ?? null,
+            'line_items' => $lineItems,
+        ], fn ($value): bool => $value !== null && $value !== []);
     }
 
     /**

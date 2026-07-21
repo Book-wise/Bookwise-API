@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Booking;
+use App\Models\BlockedSlot;
 use App\Models\Location;
 use App\Models\Service;
 use Carbon\Carbon;
@@ -45,6 +46,16 @@ class SlotAvailabilityService
             ->whereDate('start_time', $date)
             ->get(['start_time', 'end_time', 'provider_id']);
 
+        $blockedSlots = BlockedSlot::where('location_id', $locationId)
+            ->when($providerId !== null, function ($query) use ($providerId) {
+                $query->where(function ($query) use ($providerId) {
+                    $query->whereNull('provider_id')->orWhere('provider_id', $providerId);
+                });
+            })
+            ->where('start_time', '<', $dayEnd)
+            ->where('end_time', '>', $dayStart)
+            ->get(['start_time', 'end_time', 'provider_id']);
+
         // ── 4. Generar slots y filtrar colisiones ──────────────────
         $slots = collect();
         $cursor = $dayStart->copy();
@@ -58,7 +69,12 @@ class SlotAvailabilityService
                     && $slotEnd->gt(Carbon::parse($booking->start_time));
             });
 
-            if (! $hasCollision) {
+            $hasBlockedSlot = $blockedSlots->contains(function ($blockedSlot) use ($slotStart, $slotEnd) {
+                return $slotStart->lt(Carbon::parse($blockedSlot->end_time))
+                    && $slotEnd->gt(Carbon::parse($blockedSlot->start_time));
+            });
+
+            if (! $hasCollision && ! $hasBlockedSlot) {
                 $slots->push([
                     'start' => $slotStart->toIso8601String(),
                     'end' => $slotEnd->toIso8601String(),

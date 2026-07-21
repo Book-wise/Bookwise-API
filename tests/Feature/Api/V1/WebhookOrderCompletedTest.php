@@ -284,6 +284,60 @@ class WebhookOrderCompletedTest extends TestCase
         ]);
     }
 
+    public function test_missing_webhook_secret_returns_configuration_error(): void
+    {
+        config(['services.woocommerce.webhook_secret' => '']);
+
+        $response = $this->sendWebhook($this->buildPayload());
+
+        $response->assertStatus(503);
+        $response->assertJson(['error' => 'configuration_error']);
+        $this->assertDatabaseCount('woocommerce_webhooks_log', 0);
+    }
+
+    public function test_webhook_log_redacts_billing_personal_data(): void
+    {
+        $payload = $this->buildPayload();
+
+        $this->sendWebhook($payload)->assertStatus(200);
+
+        $log = \App\Models\WoocommerceWebhooksLog::firstOrFail();
+        $storedPayload = $log->payload;
+
+        $this->assertArrayNotHasKey('billing', $storedPayload);
+        $this->assertStringNotContainsString($payload['billing']['email'], json_encode($storedPayload));
+        $this->assertSame('order.completed', $storedPayload['topic']);
+        $this->assertSame($payload['id'], $storedPayload['id']);
+    }
+
+    public function test_refund_cancels_once_without_creating_financial_reversal(): void
+    {
+        BookingStatus::create(['name' => 'Cancelled', 'is_cancellation' => true]);
+        $payload = $this->buildPayload();
+        $this->sendWebhook($payload)->assertStatus(200);
+
+        $refundPayload = ['id' => $payload['id'], 'status' => 'refunded'];
+        $json = json_encode($refundPayload);
+        $signature = base64_encode(hash_hmac('sha256', $json, $this->webhookSecret, true));
+
+        $headers = [
+            'X-WC-Webhook-Signature' => $signature,
+            'X-WC-Webhook-Topic' => 'order.refunded',
+        ];
+
+        $this->withHeaders($headers)->postJson('/api/v1/webhooks/woocommerce', $refundPayload)->assertStatus(200);
+        $this->withHeaders($headers)->postJson('/api/v1/webhooks/woocommerce', $refundPayload)->assertStatus(200);
+
+        $booking = Booking::where('wc_order_id', $payload['id'])->firstOrFail();
+        $this->assertTrue((bool) $booking->status->is_cancellation);
+        $this->assertDatabaseCount('sale_transactions', 1);
+        $this->assertDatabaseCount('booking_status_history', 2);
+        $this->assertDatabaseHas('woocommerce_webhooks_log', [
+            'wc_order_id' => $payload['id'],
+            'status' => 'processed',
+        ]);
+    }
+
     // ── Client already exists — upsert ──────────────────────────────
 
     public function test_existing_client_is_updated_not_duplicated(): void

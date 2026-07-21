@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Booking;
+use App\Models\BlockedSlot;
 use Carbon\Carbon;
 
 class BookingService
@@ -11,12 +12,27 @@ class BookingService
      * Verify if a time slot is available at a given location.
      * Returns true if slot is free (no active overlapping bookings), false if occupied.
      */
-    public function verifyAvailability(int $locationId, string $startTime, string $endTime): bool
+    public function verifyAvailability(int $locationId, string $startTime, string $endTime, ?int $providerId = null): bool
     {
-        return ! Booking::where('location_id', $locationId)
+        $start = Carbon::parse($startTime);
+        $end = Carbon::parse($endTime);
+
+        $hasBooking = Booking::where('location_id', $locationId)
             ->active()
-            ->overlapping(Carbon::parse($startTime), Carbon::parse($endTime))
+            ->overlapping($start, $end)
             ->exists();
+
+        $hasBlockedSlot = BlockedSlot::where('location_id', $locationId)
+            ->when($providerId !== null, function ($query) use ($providerId) {
+                $query->where(function ($query) use ($providerId) {
+                    $query->whereNull('provider_id')->orWhere('provider_id', $providerId);
+                });
+            })
+            ->where('start_time', '<', $end)
+            ->where('end_time', '>', $start)
+            ->exists();
+
+        return ! $hasBooking && ! $hasBlockedSlot;
     }
 
     /**

@@ -54,6 +54,9 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
     Route::patch('/bookings/{id}/cancel', [BookingController::class, 'cancel'])
         ->middleware('scope:bookings:write');
 
+    Route::post('/services', [ServiceController::class, 'store'])
+        ->middleware('role:admin');
+
     // Clients
     Route::get('/clients', [ClientController::class, 'index'])
         ->middleware('scope:clients:read');

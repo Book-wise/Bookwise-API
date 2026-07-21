@@ -10,6 +10,12 @@ class TestDataSeeder extends Seeder
 {
     public function run(): void
     {
+        if (! app()->environment(['local', 'testing'])) {
+            $this->command?->warn('TestDataSeeder is restricted to local and testing environments.');
+
+            return;
+        }
+
         // ── Locations ─────────────────────────────────────────────────
         $locCentro = DB::table('locations')->insertGetId(['name' => 'Kinesilk Centro',      'address' => 'Av. Providencia 1234',      'city' => 'Santiago', 'timezone' => 'America/Santiago', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
         $locLasCondes = DB::table('locations')->insertGetId(['name' => 'Kinesilk Las Condes',  'address' => 'Av. Apoquindo 4500',        'city' => 'Santiago', 'timezone' => 'America/Santiago', 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
