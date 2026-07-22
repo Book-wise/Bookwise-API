@@ -7,12 +7,11 @@ use App\Http\Resources\V1\BookingResource;
 use App\Models\BlockedSlot;
 use App\Models\Booking;
 use App\Models\BookingStatus;
-use App\Models\Client;
 use App\Models\Location;
-use App\Models\Provider;
 use App\Models\Service;
 use App\Policies\BookingPolicy;
 use App\Services\IdempotencyService;
+use App\Services\SchedulingLockService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,6 +22,7 @@ class BookingController extends Controller
     public function __construct(
         private readonly BookingPolicy $bookingPolicy,
         private readonly IdempotencyService $idempotency,
+        private readonly SchedulingLockService $schedulingLocks,
     ) {}
 
     // ── GET /v1/bookings ───────────────────────────────────────────
@@ -113,7 +113,7 @@ class BookingController extends Controller
 
         try {
             $result = DB::transaction(function () use ($validated, $startTime, $endTime, $service): array {
-                $this->lockSchedulingResources(
+                $this->schedulingLocks->lock(
                     $validated['location_id'],
                     $validated['client_id'],
                     $validated['provider_id'] ?? null,
@@ -187,7 +187,7 @@ class BookingController extends Controller
                 ? Carbon::parse($validated['end_time'])
                 : ($lockedBooking->end_time ?? $startTime->copy()->addMinutes($lockedBooking->effective_duration_minutes));
 
-            $this->lockSchedulingResources(
+            $this->schedulingLocks->lock(
                 $lockedBooking->location_id,
                 $lockedBooking->client_id,
                 $validated['provider_id'] ?? $lockedBooking->provider_id,
@@ -328,16 +328,6 @@ class BookingController extends Controller
             ->first();
 
         return $blockedSlot ? ['type' => 'blocked_slot', 'blocked_slot' => $blockedSlot] : null;
-    }
-
-    private function lockSchedulingResources(int $locationId, int $clientId, ?int $providerId): void
-    {
-        Location::whereKey($locationId)->lockForUpdate()->firstOrFail();
-        Client::whereKey($clientId)->lockForUpdate()->firstOrFail();
-
-        if ($providerId !== null) {
-            Provider::whereKey($providerId)->lockForUpdate()->firstOrFail();
-        }
     }
 
     /** @param array{type: string, booking?: Booking, blocked_slot?: BlockedSlot} $conflict */

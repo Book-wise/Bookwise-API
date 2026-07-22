@@ -8,16 +8,19 @@ use App\Models\BlockedSlot;
 use App\Models\Booking;
 use App\Models\Provider;
 use App\Services\IdempotencyService;
+use App\Services\SchedulingLockService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class BlockedSlotController extends Controller
 {
     public function __construct(
         private readonly IdempotencyService $idempotency,
+        private readonly SchedulingLockService $schedulingLocks,
     ) {}
 
     // ── POST /v1/blocked-slots ─────────────────────────────────────
@@ -72,29 +75,35 @@ class BlockedSlotController extends Controller
                 ], 403);
             }
 
-            $providers = Provider::where('location_id', $data['location_id'])
-                ->where('active', true)
-                ->get();
+            [$blocked, $conflicts] = DB::transaction(function () use ($data, $start, $end, $duration): array {
+                $this->schedulingLocks->lock($data['location_id']);
 
-            $blocked = [];
-            $conflicts = [];
+                $providers = Provider::where('location_id', $data['location_id'])
+                    ->where('active', true)
+                    ->get();
 
-            foreach ($providers as $provider) {
-                $result = $this->blockProvider($provider, $data, $start, $end, $duration);
+                $blocked = [];
+                $conflicts = [];
 
-                if ($result['status'] === 'created') {
-                    $blocked = array_merge($blocked, $result['slots']->pluck('id')->all());
-                } else {
-                    $conflicts[] = [
-                        'provider' => [
-                            'id' => $provider->id,
-                            'first_name' => $provider->first_name,
-                            'last_name' => $provider->last_name,
-                        ],
-                        'conflict' => $result['conflict'],
-                    ];
+                foreach ($providers as $provider) {
+                    $result = $this->blockProvider($provider, $data, $start, $end, $duration);
+
+                    if ($result['status'] === 'created') {
+                        $blocked = array_merge($blocked, $result['slots']->pluck('id')->all());
+                    } else {
+                        $conflicts[] = [
+                            'provider' => [
+                                'id' => $provider->id,
+                                'first_name' => $provider->first_name,
+                                'last_name' => $provider->last_name,
+                            ],
+                            'conflict' => $result['conflict'],
+                        ];
+                    }
                 }
-            }
+
+                return [$blocked, $conflicts];
+            }, 3);
 
             if ($hasIdempotencyKey) {
                 $this->idempotency->store($request, $endpoint, 201, [
@@ -122,7 +131,11 @@ class BlockedSlotController extends Controller
             ], 422);
         }
 
-        $result = $this->blockProvider($provider, $data, $start, $end, $duration);
+        $result = DB::transaction(function () use ($provider, $data, $start, $end, $duration): array {
+            $this->schedulingLocks->lock($provider->location_id, null, $provider->id);
+
+            return $this->blockProvider($provider, $data, $start, $end, $duration);
+        }, 3);
 
         if ($result['status'] === 'conflict') {
             $detail = $result['conflict']['type'] === 'booking'
