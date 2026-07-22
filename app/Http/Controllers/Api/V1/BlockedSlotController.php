@@ -37,6 +37,11 @@ class BlockedSlotController extends Controller
             }
 
             $status = $this->idempotency->acquire($request, $endpoint, $requestHash);
+            if ($status === 2) {
+                return $this->idempotency->check($request, $endpoint)
+                    ?? response()->json(['error' => 'conflict', 'detail' => 'Idempotent response is unavailable.'], 409);
+            }
+
             if ($status === 1) {
                 return response()->json([
                     'error' => 'conflict',

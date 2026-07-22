@@ -108,7 +108,13 @@ class BookingController extends Controller
                 return $cached;
             }
 
-            if ($this->idempotency->acquire($request, $endpoint, $requestHash) === 1) {
+            $idempotencyStatus = $this->idempotency->acquire($request, $endpoint, $requestHash);
+            if ($idempotencyStatus === 2) {
+                return $this->idempotency->check($request, $endpoint)
+                    ?? response()->json(['error' => 'conflict', 'detail' => 'Idempotent response is unavailable.'], 409);
+            }
+
+            if ($idempotencyStatus === 1) {
                 return response()->json([
                     'error' => 'conflict',
                     'detail' => 'A request with this idempotency key is already in progress or conflicts.',
@@ -253,7 +259,13 @@ class BookingController extends Controller
                 return $cached;
             }
 
-            if ($this->idempotency->acquire($request, $endpoint, $requestHash) === 1) {
+            $idempotencyStatus = $this->idempotency->acquire($request, $endpoint, $requestHash);
+            if ($idempotencyStatus === 2) {
+                return $this->idempotency->check($request, $endpoint)
+                    ?? response()->json(['error' => 'conflict', 'detail' => 'Idempotent response is unavailable.'], 409);
+            }
+
+            if ($idempotencyStatus === 1) {
                 return response()->json([
                     'error' => 'conflict',
                     'detail' => 'A request with this idempotency key is already in progress or conflicts.',
