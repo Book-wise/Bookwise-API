@@ -2,62 +2,78 @@
 
 namespace App\Policies;
 
+use App\Enums\UserRole;
 use App\Models\Booking;
-use App\Models\Location;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Builder;
 
 class BookingPolicy
 {
-    public function before(User $user, string $ability): ?bool
-    {
-        return $user->isAdmin() ? true : null;
-    }
-
-    public function viewAny(User $user): bool
-    {
-        return ! $user->isProvider() || $this->providerLocationId($user) !== null;
-    }
-
+    /**
+     * Determine whether the user can view the booking.
+     */
     public function view(User $user, Booking $booking): bool
     {
-        return ! $user->isProvider() || $booking->location_id === $this->providerLocationId($user);
-    }
+        if ($user->isAdmin()) {
+            return true;
+        }
 
-    public function create(User $user, Location $location): bool
-    {
-        return ! $user->isProvider() || $location->id === $this->providerLocationId($user);
-    }
+        if ($user->role === UserRole::AGENT) {
+            return true;
+        }
 
-    public function update(User $user, Booking $booking): bool
-    {
-        return $this->view($user, $booking);
-    }
+        if ($user->isProvider()) {
+            $provider = $user->provider;
 
-    public function cancel(User $user, Booking $booking): bool
-    {
-        return $this->view($user, $booking);
+            return $provider !== null
+                && $provider->location_id === $booking->location_id;
+        }
+
+        return false;
     }
 
     /**
-     * @param  Builder<Booking>  $query
-     * @return Builder<Booking>
+     * Determine whether the user can update the booking.
      */
-    public function scopeVisibleTo(Builder $query, User $user): Builder
+    public function update(User $user, Booking $booking): bool
     {
-        if (! $user->isProvider()) {
-            return $query;
+        if ($user->isAdmin()) {
+            return true;
         }
 
-        $locationId = $this->providerLocationId($user);
+        if ($user->role === UserRole::AGENT) {
+            return true;
+        }
 
-        return $locationId === null
-            ? $query->whereRaw('1 = 0')
-            : $query->where('location_id', $locationId);
+        if ($user->isProvider()) {
+            $provider = $user->provider;
+
+            return $provider !== null
+                && $provider->location_id === $booking->location_id;
+        }
+
+        return false;
     }
 
-    private function providerLocationId(User $user): ?int
+    /**
+     * Determine whether the user can cancel the booking.
+     */
+    public function cancel(User $user, Booking $booking): bool
     {
-        return $user->provider?->location_id;
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        if ($user->role === UserRole::AGENT) {
+            return true;
+        }
+
+        if ($user->isProvider()) {
+            $provider = $user->provider;
+
+            return $provider !== null
+                && $provider->location_id === $booking->location_id;
+        }
+
+        return false;
     }
 }

@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\AvailableSlotsRequest;
 use App\Http\Resources\V1\AvailableSlotResource;
 use App\Services\SlotAvailabilityService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class AvailableSlotsController extends Controller
 {
@@ -14,25 +14,9 @@ class AvailableSlotsController extends Controller
         private SlotAvailabilityService $slotService
     ) {}
 
-    public function index(Request $request): JsonResponse
+    public function index(AvailableSlotsRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'location_id' => ['required', 'integer', 'exists:locations,id'],
-            'start_date' => ['required', 'date_format:Y-m-d'],
-            'service_id' => ['nullable', 'integer', 'exists:services,id'],
-            'provider_id' => ['nullable', 'integer', 'exists:providers,id'],
-            'duration_minutes' => [
-                'nullable', 'integer',
-                'min:'.env('BOOKING_MIN_DURATION_MINUTES', 15),
-                'max:'.env('BOOKING_MAX_DURATION_MINUTES', 480),
-                function ($attribute, $value, $fail) {
-                    if ($value !== null && $value % 15 !== 0) {
-                        $fail('The duration must be a multiple of 15 minutes.');
-                    }
-                },
-            ],
-            'slot_interval' => ['nullable', 'integer', 'min:5', 'max:480'],
-        ]);
+        $validated = $request->validated();
 
         $slots = $this->slotService->getAvailableSlots(
             locationId: $validated['location_id'],

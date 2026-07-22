@@ -14,9 +14,9 @@ class WooCommerceService
 
     public function __construct()
     {
-        $this->baseUrl = rtrim(env('WC_BASE_URL'), '/').'/wp-json/wc/v3';
-        $this->consumerKey = env('WC_CONSUMER_KEY');
-        $this->consumerSecret = env('WC_CONSUMER_SECRET');
+        $this->baseUrl = rtrim(config('services.woocommerce.store_url', env('WC_BASE_URL')), '/').'/wp-json/wc/v3';
+        $this->consumerKey = config('services.woocommerce.consumer_key');
+        $this->consumerSecret = config('services.woocommerce.consumer_secret');
     }
 
     private function client()

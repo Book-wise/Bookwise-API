@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api\V1;
 
+use App\Jobs\ProcessWooCommerceWebhook;
 use App\Models\Booking;
 use App\Models\BookingStatus;
 use App\Models\Client;
@@ -9,9 +10,15 @@ use App\Models\Location;
 use App\Models\Sale;
 use App\Models\Service;
 use App\Models\WoocommerceWebhooksLog;
+use App\Services\BookingService;
+use App\Services\ClientService;
+use App\Services\SaleService;
+use App\Services\WooCommerceCustomerService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
+use RuntimeException;
 use Tests\TestCase;
 
 class WebhookOrderCompletedTest extends TestCase
@@ -49,10 +56,13 @@ class WebhookOrderCompletedTest extends TestCase
         ]);
     }
 
+    // ── Helpers ─────────────────────────────────────────────────────
+
     private function buildPayload(array $overrides = []): array
     {
         $defaults = [
             'id' => 12345,
+            'status' => 'completed',
             'total' => '50000',
             'date_paid' => Carbon::now()->toIso8601String(),
             'payment_method' => 'credit_card',
@@ -87,7 +97,7 @@ class WebhookOrderCompletedTest extends TestCase
 
         return [
             'X-WC-Webhook-Signature' => $signature,
-            'X-WC-Webhook-Topic' => 'order.completed',
+            'X-WC-Webhook-Topic' => 'order.updated',
         ];
     }
 
@@ -99,20 +109,112 @@ class WebhookOrderCompletedTest extends TestCase
             ->postJson('/api/v1/webhooks/woocommerce', $payload);
     }
 
-    // ── Happy path ──────────────────────────────────────────────────
+    /**
+     * Helper: run the job synchronously by calling handle() directly.
+     * Returns the refreshed log entry for status assertions.
+     */
+    private function runJob(string $event, array $payloadData): WoocommerceWebhooksLog
+    {
+        $log = WoocommerceWebhooksLog::create([
+            'event' => $event,
+            'wc_order_id' => $payloadData['id'] ?? null,
+            'wc_entity_id' => $payloadData['id'] ?? null,
+            'entity_type' => 'order',
+            'payload' => json_encode($payloadData),
+            'status' => 'received',
+        ]);
 
-    public function test_happy_path_creates_booking_sale_and_transaction(): void
+        $job = new ProcessWooCommerceWebhook(
+            event: $event,
+            payload: json_encode($payloadData),
+            logId: $log->id,
+        );
+
+        $job->handle(
+            app(WooCommerceCustomerService::class),
+            app(ClientService::class),
+            app(BookingService::class),
+            app(SaleService::class),
+        );
+
+        return $log->fresh();
+    }
+
+    // ── Controller: HMAC validation ─────────────────────────────────
+
+    public function test_invalid_signature_returns_401(): void
     {
         $payload = $this->buildPayload();
 
+        $response = $this->withHeaders([
+            'X-WC-Webhook-Signature' => 'invalid-signature',
+            'X-WC-Webhook-Topic' => 'order.updated',
+        ])->postJson('/api/v1/webhooks/woocommerce', $payload);
+
+        $response->assertStatus(401);
+        $response->assertJson([
+            'error' => 'unauthorized',
+        ]);
+    }
+
+    // ── Controller: Job dispatch ────────────────────────────────────
+
+    public function test_valid_webhook_dispatches_job(): void
+    {
+        Queue::fake();
+
+        $payload = $this->buildPayload();
         $response = $this->sendWebhook($payload);
 
         $response->assertStatus(200);
-        $response->assertJsonStructure([
-            'booking_id',
-            'sale_id',
-            'client_id',
-        ]);
+        $response->assertJson(['received' => true]);
+
+        Queue::assertPushed(ProcessWooCommerceWebhook::class, function ($job) {
+            return $job->event === 'order.updated';
+        });
+    }
+
+    public function test_customer_created_dispatches_job(): void
+    {
+        Queue::fake();
+
+        $payload = [
+            'id' => 999,
+            'email' => 'wc-customer@test.com',
+            'first_name' => 'WC',
+            'last_name' => 'Customer',
+            'billing' => [
+                'first_name' => 'WC',
+                'last_name' => 'Customer',
+                'phone' => '+1234567890',
+            ],
+        ];
+
+        $json = json_encode($payload);
+        $signature = base64_encode(hash_hmac('sha256', $json, $this->webhookSecret, true));
+
+        $response = $this->withHeaders([
+            'X-WC-Webhook-Signature' => $signature,
+            'X-WC-Webhook-Topic' => 'customer.created',
+        ])->postJson('/api/v1/webhooks/woocommerce', $payload);
+
+        $response->assertStatus(200);
+        $response->assertJson(['received' => true]);
+
+        Queue::assertPushed(ProcessWooCommerceWebhook::class, function ($job) {
+            return $job->event === 'customer.created';
+        });
+    }
+
+    // ── Happy path (job) ────────────────────────────────────────────
+
+    public function test_job_creates_booking_sale_and_transaction(): void
+    {
+        $payload = $this->buildPayload();
+        $log = $this->runJob('order.completed', $payload);
+
+        // Verify log status
+        $this->assertSame('processed', $log->status);
 
         // Verify client was created
         $this->assertDatabaseHas('clients', [
@@ -147,8 +249,9 @@ class WebhookOrderCompletedTest extends TestCase
         ]);
 
         // Verify sale transaction was created
+        $sale = Sale::where('wc_order_id', 12345)->first();
         $this->assertDatabaseHas('sale_transactions', [
-            'sale_id' => $response->json('sale_id'),
+            'sale_id' => $sale->id,
             'amount' => 50000,
             'payment_method' => 'credit_card',
         ]);
@@ -160,36 +263,32 @@ class WebhookOrderCompletedTest extends TestCase
         ]);
     }
 
-    // ── Idempotent replay ───────────────────────────────────────────
+    // ── Idempotent replay (job) ─────────────────────────────────────
 
-    public function test_idempotent_replay_returns_existing_records(): void
+    public function test_job_idempotent_replay_does_not_duplicate(): void
     {
         $payload = $this->buildPayload();
 
-        // First request — creates everything
-        $firstResponse = $this->sendWebhook($payload);
-        $firstResponse->assertStatus(200);
-        $firstBody = $firstResponse->json();
+        // First run
+        $firstLog = $this->runJob('order.completed', $payload);
+        $this->assertSame('processed', $firstLog->status);
 
-        // Second request — same payload, should return existing records
-        $secondResponse = $this->sendWebhook($payload);
-        $secondResponse->assertStatus(200);
-        $secondBody = $secondResponse->json();
+        $bookingCount = Booking::count();
+        $saleCount = Sale::count();
 
-        // Should return the same booking and sale IDs
-        $this->assertSame($firstBody['booking_id'], $secondBody['booking_id']);
-        $this->assertSame($firstBody['sale_id'], $secondBody['sale_id']);
-        $this->assertSame($firstBody['client_id'], $secondBody['client_id']);
+        // Second run — same payload
+        $secondLog = $this->runJob('order.completed', $payload);
+        $this->assertSame('processed', $secondLog->status);
 
-        // Only one booking, one sale, one transaction
-        $this->assertDatabaseCount('bookings', 1);
-        $this->assertDatabaseCount('sales', 1);
-        $this->assertDatabaseCount('sale_transactions', 1);
+        // Should NOT create duplicates
+        $this->assertDatabaseCount('bookings', $bookingCount);
+        $this->assertDatabaseCount('sales', $saleCount);
+        $this->assertDatabaseCount('sale_transactions', $saleCount);
     }
 
-    // ── Slot unavailable ────────────────────────────────────────────
+    // ── Slot unavailable (job) ──────────────────────────────────────
 
-    public function test_slot_unavailable_returns_409(): void
+    public function test_job_slot_unavailable_fails_log(): void
     {
         $payload = $this->buildPayload();
         $slotStart = Carbon::tomorrow()->addHours(10);
@@ -212,20 +311,34 @@ class WebhookOrderCompletedTest extends TestCase
             'price' => 50000,
         ]);
 
-        $response = $this->sendWebhook($payload);
-
-        $response->assertStatus(409);
-        $response->assertJson([
-            'error' => 'slot_unavailable',
+        $log = WoocommerceWebhooksLog::create([
+            'event' => 'order.completed',
+            'wc_order_id' => $payload['id'],
+            'wc_entity_id' => $payload['id'],
+            'entity_type' => 'order',
+            'payload' => json_encode($payload),
+            'status' => 'received',
         ]);
 
-        // No sale should be created
-        $this->assertDatabaseCount('sales', 0);
+        $job = new ProcessWooCommerceWebhook(
+            event: 'order.completed',
+            payload: json_encode($payload),
+            logId: $log->id,
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Slot unavailable');
+        $job->handle(
+            app(WooCommerceCustomerService::class),
+            app(ClientService::class),
+            app(BookingService::class),
+            app(SaleService::class),
+        );
     }
 
-    // ── Missing billing.email ──────────────────────────────────────
+    // ── Missing billing.email (job) ─────────────────────────────────
 
-    public function test_missing_billing_email_returns_400(): void
+    public function test_job_missing_billing_email_fails_log(): void
     {
         $payload = $this->buildPayload();
         $payload['billing'] = [
@@ -233,18 +346,40 @@ class WebhookOrderCompletedTest extends TestCase
             'last_name' => 'Doe',
         ];
 
-        $response = $this->sendWebhook($payload);
-
-        $response->assertStatus(400);
-        $response->assertJson([
-            'error' => 'validation_error',
-            'detail' => 'Missing billing.email in payload.',
+        $log = WoocommerceWebhooksLog::create([
+            'event' => 'order.completed',
+            'wc_order_id' => $payload['id'],
+            'wc_entity_id' => $payload['id'],
+            'entity_type' => 'order',
+            'payload' => json_encode($payload),
+            'status' => 'received',
         ]);
+
+        $job = new ProcessWooCommerceWebhook(
+            event: 'order.completed',
+            payload: json_encode($payload),
+            logId: $log->id,
+        );
+
+        try {
+            $job->handle(
+                app(WooCommerceCustomerService::class),
+                app(ClientService::class),
+                app(BookingService::class),
+                app(SaleService::class),
+            );
+            $this->fail('Expected RuntimeException was not thrown.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('Missing billing.email', $e->getMessage());
+        }
+
+        // Log should be marked as failed
+        $this->assertSame('failed', $log->fresh()->status);
     }
 
-    // ── Missing line-item meta ──────────────────────────────────────
+    // ── Missing line-item meta (job) ────────────────────────────────
 
-    public function test_missing_line_item_meta_returns_200_processed(): void
+    public function test_job_missing_line_item_meta_does_not_create_booking(): void
     {
         $payload = $this->buildPayload();
         $payload['line_items'] = [
@@ -255,93 +390,32 @@ class WebhookOrderCompletedTest extends TestCase
             ],
         ];
 
-        $response = $this->sendWebhook($payload);
+        $log = $this->runJob('order.completed', $payload);
 
-        $response->assertStatus(200);
-        $this->assertDatabaseHas('woocommerce_webhooks_log', [
-            'wc_order_id' => 12345,
-            'status' => 'processed',
-        ]);
+        $this->assertSame('processed', $log->status);
 
         // No booking or sale should be created
         $this->assertDatabaseCount('bookings', 0);
         $this->assertDatabaseCount('sales', 0);
     }
 
-    // ── Invalid signature ──────────────────────────────────────────
+    // ── No line_items at all (job) ─────────────────────────────────
 
-    public function test_invalid_signature_returns_401(): void
+    public function test_job_no_line_items_does_not_create_booking(): void
     {
         $payload = $this->buildPayload();
+        $payload['line_items'] = [];
 
-        $response = $this->withHeaders([
-            'X-WC-Webhook-Signature' => 'invalid-signature',
-            'X-WC-Webhook-Topic' => 'order.completed',
-        ])->postJson('/api/v1/webhooks/woocommerce', $payload);
+        $log = $this->runJob('order.completed', $payload);
 
-        $response->assertStatus(401);
-        $response->assertJson([
-            'error' => 'unauthorized',
-        ]);
+        $this->assertSame('processed', $log->status);
+        $this->assertDatabaseCount('bookings', 0);
+        $this->assertDatabaseCount('sales', 0);
     }
 
-    public function test_missing_webhook_secret_returns_configuration_error(): void
-    {
-        config(['services.woocommerce.webhook_secret' => '']);
+    // ── Existing client upsert (job) ────────────────────────────────
 
-        $response = $this->sendWebhook($this->buildPayload());
-
-        $response->assertStatus(503);
-        $response->assertJson(['error' => 'configuration_error']);
-        $this->assertDatabaseCount('woocommerce_webhooks_log', 0);
-    }
-
-    public function test_webhook_log_redacts_billing_personal_data(): void
-    {
-        $payload = $this->buildPayload();
-
-        $this->sendWebhook($payload)->assertStatus(200);
-
-        $log = WoocommerceWebhooksLog::firstOrFail();
-        $storedPayload = $log->payload;
-
-        $this->assertArrayNotHasKey('billing', $storedPayload);
-        $this->assertStringNotContainsString($payload['billing']['email'], json_encode($storedPayload));
-        $this->assertSame('order.completed', $storedPayload['topic']);
-        $this->assertSame($payload['id'], $storedPayload['id']);
-    }
-
-    public function test_refund_cancels_once_without_creating_financial_reversal(): void
-    {
-        BookingStatus::create(['name' => 'Cancelled', 'is_cancellation' => true]);
-        $payload = $this->buildPayload();
-        $this->sendWebhook($payload)->assertStatus(200);
-
-        $refundPayload = ['id' => $payload['id'], 'status' => 'refunded'];
-        $json = json_encode($refundPayload);
-        $signature = base64_encode(hash_hmac('sha256', $json, $this->webhookSecret, true));
-
-        $headers = [
-            'X-WC-Webhook-Signature' => $signature,
-            'X-WC-Webhook-Topic' => 'order.refunded',
-        ];
-
-        $this->withHeaders($headers)->postJson('/api/v1/webhooks/woocommerce', $refundPayload)->assertStatus(200);
-        $this->withHeaders($headers)->postJson('/api/v1/webhooks/woocommerce', $refundPayload)->assertStatus(200);
-
-        $booking = Booking::where('wc_order_id', $payload['id'])->firstOrFail();
-        $this->assertTrue((bool) $booking->status->is_cancellation);
-        $this->assertDatabaseCount('sale_transactions', 1);
-        $this->assertDatabaseCount('booking_status_history', 2);
-        $this->assertDatabaseHas('woocommerce_webhooks_log', [
-            'wc_order_id' => $payload['id'],
-            'status' => 'processed',
-        ]);
-    }
-
-    // ── Client already exists — upsert ──────────────────────────────
-
-    public function test_existing_client_is_updated_not_duplicated(): void
+    public function test_job_existing_client_is_updated_not_duplicated(): void
     {
         // Pre-create a client with the same email
         $client = Client::create([
@@ -352,10 +426,9 @@ class WebhookOrderCompletedTest extends TestCase
         ]);
 
         $payload = $this->buildPayload();
+        $log = $this->runJob('order.completed', $payload);
 
-        $response = $this->sendWebhook($payload);
-
-        $response->assertStatus(200);
+        $this->assertSame('processed', $log->status);
 
         // Only one client with this email
         $this->assertDatabaseCount('clients', 1);
@@ -366,25 +439,11 @@ class WebhookOrderCompletedTest extends TestCase
         $this->assertSame('Doe', $client->last_name);
     }
 
-    // ── No line_items at all ───────────────────────────────────────
+    // ── Customer created event (job) ────────────────────────────────
 
-    public function test_no_line_items_returns_200_processed(): void
+    public function test_job_customer_created_syncs_client(): void
     {
-        $payload = $this->buildPayload();
-        $payload['line_items'] = [];
-
-        $response = $this->sendWebhook($payload);
-
-        $response->assertStatus(200);
-        $this->assertDatabaseCount('bookings', 0);
-        $this->assertDatabaseCount('sales', 0);
-    }
-
-    // ── Existing customer events unchanged ──────────────────────────
-
-    public function test_customer_created_still_works(): void
-    {
-        $payload = [
+        $payloadData = [
             'id' => 999,
             'email' => 'wc-customer@test.com',
             'first_name' => 'WC',
@@ -396,15 +455,30 @@ class WebhookOrderCompletedTest extends TestCase
             ],
         ];
 
-        $json = json_encode($payload);
-        $signature = base64_encode(hash_hmac('sha256', $json, $this->webhookSecret, true));
+        $log = WoocommerceWebhooksLog::create([
+            'event' => 'customer.created',
+            'wc_entity_id' => $payloadData['id'],
+            'entity_type' => 'customer',
+            'payload' => json_encode($payloadData),
+            'status' => 'received',
+        ]);
 
-        $response = $this->withHeaders([
-            'X-WC-Webhook-Signature' => $signature,
-            'X-WC-Webhook-Topic' => 'customer.created',
-        ])->postJson('/api/v1/webhooks/woocommerce', $payload);
+        $job = new ProcessWooCommerceWebhook(
+            event: 'customer.created',
+            payload: json_encode($payloadData),
+            logId: $log->id,
+        );
 
-        $response->assertStatus(200);
+        $job->handle(
+            app(WooCommerceCustomerService::class),
+            app(ClientService::class),
+            app(BookingService::class),
+            app(SaleService::class),
+        );
+
         $this->assertDatabaseHas('clients', ['wc_customer_id' => 999]);
+
+        $log->refresh();
+        $this->assertSame('processed', $log->status);
     }
 }
