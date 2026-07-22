@@ -69,16 +69,20 @@ class BookingController extends Controller
         ]);
 
         $service = Service::findOrFail($validated['service_id']);
-        $startTime = Carbon::parse($validated['start_time']);
 
-        // Duración efectiva — CHG-001
+        $location = Location::findOrFail($validated['location_id']);
+        $startTime = $this->parseInLocationTimezone($validated['start_time'], $location);
+        $validated['start_time'] = $startTime;
+
         $effectiveDuration = $validated['duration_minutes']
             ?? $service->duration_minutes
             ?? (int) env('BOOKING_DEFAULT_DURATION_MINUTES', 30);
 
         $endTime = isset($validated['end_time'])
-            ? Carbon::parse($validated['end_time'])
+            ? $this->parseInLocationTimezone($validated['end_time'], $location)
             : $startTime->copy()->addMinutes($effectiveDuration);
+
+        $validated['end_time'] = $endTime;
 
         // Check for booking overlaps (location or client)
         $conflict = $this->checkBookingOverlap(
@@ -134,21 +138,26 @@ class BookingController extends Controller
         if (isset($validated['start_time']) || isset($validated['end_time'])
             || isset($validated['location_id']) || isset($validated['client_id'])) {
 
-            $startTime = isset($validated['start_time'])
-                ? Carbon::parse($validated['start_time'])
-                : $booking->start_time;
-
-            $endTime = isset($validated['end_time'])
-                ? Carbon::parse($validated['end_time'])
-                : ($booking->end_time ?? $startTime->copy()->addMinutes($booking->effective_duration_minutes));
-
             $locationId = isset($validated['location_id'])
                 ? $validated['location_id']
                 : $booking->location_id;
 
+            $location = Location::findOrFail($locationId);
+
+            $startTime = isset($validated['start_time'])
+                ? $this->parseInLocationTimezone($validated['start_time'], $location)
+                : $booking->start_time;
+
+            $endTime = isset($validated['end_time'])
+                ? $this->parseInLocationTimezone($validated['end_time'], $location)
+                : ($booking->end_time ?? $startTime->copy()->addMinutes($booking->effective_duration_minutes));
+
             $clientId = isset($validated['client_id'])
                 ? $validated['client_id']
                 : $booking->client_id;
+
+            $validated['start_time'] = $startTime;
+            $validated['end_time'] = $endTime;
 
             $conflict = $this->checkBookingOverlap(
                 $locationId,
@@ -240,5 +249,22 @@ class BookingController extends Controller
             ->first();
 
         return $clientConflict;
+    }
+
+    // ── Private: Parse datetime in location timezone ───────────────────
+
+    /**
+     * Parse a datetime string using the location's timezone and convert
+     * to the application's default timezone for storage consistency.
+     *
+     * If the datetime has an explicit UTC offset (e.g. "Z", "+00:00"),
+     * Carbon respects it and the location timezone is used only for the
+     * final conversion. If no offset is present, the location timezone
+     * is used to interpret the datetime as local time.
+     */
+    private function parseInLocationTimezone(string $datetime, Location $location): Carbon
+    {
+        return Carbon::parse($datetime, new \DateTimeZone($location->timezone))
+            ->setTimezone(config('app.timezone'));
     }
 }

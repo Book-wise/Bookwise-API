@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\BlockedSlotController;
 use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\ClientController;
 use App\Http\Controllers\Api\V1\ClientPackController;
+use App\Http\Controllers\Api\V1\ConfigController;
 use App\Http\Controllers\Api\V1\CustomAttributeController;
 use App\Http\Controllers\Api\V1\LocationController;
 use App\Http\Controllers\Api\V1\PackSessionController;
@@ -29,6 +30,7 @@ Route::middleware('throttle:api_public')->prefix('v1')->group(function () {
 
 // Endpoints publicos — sin token
 Route::middleware('throttle:api_public')->prefix('v1')->group(function () {
+    Route::get('/config', [ConfigController::class, 'index']);
     Route::get('/available_slots', [AvailableSlotsController::class, 'index']);
     Route::get('/services', [ServiceController::class, 'index']);
     Route::get('/services/{id}', [ServiceController::class, 'show']);
