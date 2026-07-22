@@ -286,7 +286,11 @@ class BlockedSlotController extends Controller
                 ], 422);
             }
 
-            return $this->updateForLocation($blockedSlot, $start, $end, $reason, $locationId);
+            return DB::transaction(function () use ($blockedSlot, $start, $end, $reason, $locationId): JsonResponse {
+                $this->schedulingLocks->lock($locationId);
+
+                return $this->updateForLocation($blockedSlot, $start, $end, $reason, $locationId);
+            }, 3);
         }
 
         $providerId = $data['provider_id'] ?? $blockedSlot->provider_id;
@@ -306,29 +310,33 @@ class BlockedSlotController extends Controller
             ], 422);
         }
 
-        $conflict = $this->findCollision($providerId, $start, $end, $blockedSlot->id);
+        return DB::transaction(function () use ($provider, $providerId, $start, $end, $blockedSlot, $reason, $locationId): JsonResponse {
+            $this->schedulingLocks->lock($locationId, null, $provider->id);
 
-        if ($conflict) {
-            $detail = $conflict['type'] === 'booking'
-                ? 'The provider has a booking at this time.'
-                : 'This time slot is already blocked for this provider.';
+            $conflict = $this->findCollision($providerId, $start, $end, $blockedSlot->id);
 
-            return response()->json([
-                'error' => 'slot_collision',
-                'detail' => $detail,
-                'conflicts_with' => $conflict,
-            ], 409);
-        }
+            if ($conflict) {
+                $detail = $conflict['type'] === 'booking'
+                    ? 'The provider has a booking at this time.'
+                    : 'This time slot is already blocked for this provider.';
 
-        $blockedSlot->update([
-            'start_time' => $start,
-            'end_time' => $end,
-            'reason' => $reason,
-            'provider_id' => $providerId,
-            'location_id' => $locationId,
-        ]);
+                return response()->json([
+                    'error' => 'slot_collision',
+                    'detail' => $detail,
+                    'conflicts_with' => $conflict,
+                ], 409);
+            }
 
-        return response()->json(['data' => new BlockedSlotResource($blockedSlot)]);
+            $blockedSlot->update([
+                'start_time' => $start,
+                'end_time' => $end,
+                'reason' => $reason,
+                'provider_id' => $providerId,
+                'location_id' => $locationId,
+            ]);
+
+            return response()->json(['data' => new BlockedSlotResource($blockedSlot)]);
+        }, 3);
     }
 
     /**

@@ -62,6 +62,39 @@ class BookingAuthorizationTest extends TestCase
         $this->getJson('/api/v1/bookings')->assertOk()->assertJsonCount(0, 'data');
     }
 
+    public function test_provider_cannot_access_another_provider_booking_at_the_same_location(): void
+    {
+        $otherProvider = Provider::create([
+            'first_name' => 'Other',
+            'last_name' => 'Provider',
+            'email' => 'other-provider@example.test',
+            'location_id' => $this->providerLocation->id,
+        ]);
+        $booking = $this->bookingFor($this->providerLocation);
+        $booking->update(['provider_id' => $otherProvider->id]);
+
+        $this->authenticate($this->providerUser, ['bookings:read', 'bookings:write']);
+
+        $this->getJson("/api/v1/bookings/{$booking->id}")->assertStatus(403);
+        $this->patchJson("/api/v1/bookings/{$booking->id}", ['notes' => 'Not allowed'])->assertStatus(403);
+        $this->getJson('/api/v1/bookings')->assertOk()->assertJsonCount(0, 'data');
+    }
+
+    public function test_provider_cannot_create_a_booking_outside_its_location(): void
+    {
+        $this->authenticate($this->providerUser, ['bookings:write']);
+        $start = Carbon::tomorrow()->setTime(10, 0);
+
+        $this->postJson('/api/v1/bookings', [
+            'start_time' => $start->toIso8601String(),
+            'end_time' => $start->copy()->addHour()->toIso8601String(),
+            'service_id' => $this->service->id,
+            'client_id' => $this->client->id,
+            'location_id' => $this->otherLocation->id,
+            'status_id' => $this->status->id,
+        ])->assertStatus(403);
+    }
+
     public function test_admin_can_view_any_booking_and_create_a_service_with_resource_envelope(): void
     {
         $booking = $this->bookingFor($this->otherLocation);

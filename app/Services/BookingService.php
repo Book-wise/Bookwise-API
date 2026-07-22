@@ -3,33 +3,50 @@
 namespace App\Services;
 
 use App\Enums\BookingSource;
+use App\Models\BlockedSlot;
 use App\Models\Booking;
 use Carbon\Carbon;
 
 class BookingService
 {
     /**
-     * Verify if a time slot is available at a given location.
-     * Returns true if slot is free (no active overlapping bookings), false if occupied.
+     * Checks both active bookings and agenda blocks. Callers that create or
+     * reschedule must call this only after acquiring SchedulingLockService.
      */
-    public function verifyAvailability(int $locationId, string $startTime, string $endTime): bool
+    public function verifyAvailability(int $locationId, string $startTime, string $endTime, ?int $providerId = null): bool
     {
-        return ! Booking::where('location_id', $locationId)
+        $start = Carbon::parse($startTime);
+        $end = Carbon::parse($endTime);
+
+        $bookingExists = Booking::where('location_id', $locationId)
             ->active()
-            ->overlapping(Carbon::parse($startTime), Carbon::parse($endTime))
+            ->overlapping($start, $end)
+            ->exists();
+
+        if ($bookingExists) {
+            return false;
+        }
+
+        return ! BlockedSlot::where('location_id', $locationId)
+            ->when($providerId !== null, function ($query) use ($providerId) {
+                $query->where(function ($query) use ($providerId) {
+                    $query->whereNull('provider_id')->orWhere('provider_id', $providerId);
+                });
+            })
+            ->where('start_time', '<', $end)
+            ->where('end_time', '>', $start)
             ->exists();
     }
 
     /**
-     * Find an existing booking by wc_order_id or create a new one.
-     * Provides idempotency: if a booking with the given wc_order_id exists, returns it.
+     * The WooCommerce caller must hold its location scheduling lock before
+     * invoking this method; wc_order_id provides the durable replay key.
      *
-     * @param  array  $data  Booking data
-     * @param  BookingSource|null  $createdVia  Source to set on creation. Only set on first creation, never on replay.
+     * @param  array<string, mixed>  $data
      */
     public function findOrCreateBooking(array $data, ?BookingSource $createdVia = BookingSource::OnlineWebhook): Booking
     {
-        $existing = Booking::where('wc_order_id', $data['wc_order_id'])->first();
+        $existing = Booking::where('wc_order_id', $data['wc_order_id'])->lockForUpdate()->first();
 
         if ($existing) {
             return $existing;

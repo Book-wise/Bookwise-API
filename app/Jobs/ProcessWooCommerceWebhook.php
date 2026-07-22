@@ -5,11 +5,11 @@ namespace App\Jobs;
 use App\Enums\BookingSource;
 use App\Models\Booking;
 use App\Models\BookingStatus;
-use App\Models\Sale;
 use App\Models\WoocommerceWebhooksLog;
 use App\Services\BookingService;
 use App\Services\ClientService;
 use App\Services\SaleService;
+use App\Services\SchedulingLockService;
 use App\Services\WooCommerceCustomerService;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
@@ -68,21 +68,27 @@ class ProcessWooCommerceWebhook implements ShouldBeUnique, ShouldQueue
         $data = json_decode($this->payload, true);
 
         try {
+            if (! is_array($data)) {
+                throw new RuntimeException('Webhook payload is not valid JSON.');
+            }
+
+            $schedulingLocks = app(SchedulingLockService::class);
+
             if (str_contains($this->event, 'customer.')) {
                 $this->handleCustomerEvent($data, $customerService);
             } elseif (str_contains($this->event, 'order.')) {
                 $status = $data['status'] ?? '';
 
                 match ($status) {
-                    'completed' => $this->handleOrderCompleted($data, $clientService, $bookingService, $saleService),
-                    'refunded' => $this->handleOrderRefunded($data),
+                    'completed' => $this->handleOrderCompleted($data, $clientService, $bookingService, $saleService, $schedulingLocks),
+                    'refunded' => $this->handleOrderRefunded($data, $schedulingLocks),
                     default => null, // Other order status changes are ignored
                 };
             }
 
             $log->update(['status' => 'processed']);
         } catch (\Throwable $e) {
-            $log->update(['status' => 'failed', 'error_message' => $e->getMessage()]);
+            $log->update(['status' => 'failed', 'error_message' => 'Webhook processing failed: '.class_basename($e)]);
 
             throw $e;
         }
@@ -96,7 +102,7 @@ class ProcessWooCommerceWebhook implements ShouldBeUnique, ShouldQueue
         $log = WoocommerceWebhooksLog::find($this->logId);
 
         if ($log) {
-            $log->update(['status' => 'failed', 'error_message' => $e->getMessage()]);
+            $log->update(['status' => 'failed', 'error_message' => 'Webhook processing failed: '.class_basename($e)]);
         }
     }
 
@@ -118,10 +124,10 @@ class ProcessWooCommerceWebhook implements ShouldBeUnique, ShouldQueue
         $data = json_decode($this->payload, true);
 
         if (str_contains($this->event, 'customer.')) {
-            return 'customer-'.($data['id'] ?? 'unknown');
+            return $this->event.'-customer-'.($data['id'] ?? 'unknown');
         }
 
-        return 'order-'.($data['id'] ?? 'unknown');
+        return $this->event.'-order-'.($data['id'] ?? 'unknown');
     }
 
     /**
@@ -148,6 +154,7 @@ class ProcessWooCommerceWebhook implements ShouldBeUnique, ShouldQueue
         ClientService $clientService,
         BookingService $bookingService,
         SaleService $saleService,
+        SchedulingLockService $schedulingLocks,
     ): void {
         $orderId = $data['id'] ?? null;
 
@@ -168,28 +175,7 @@ class ProcessWooCommerceWebhook implements ShouldBeUnique, ShouldQueue
         // Step 3: Sync / create client
         $client = $clientService->syncFromWooCommerce($billing);
 
-        // Step 4: Idempotency — check if booking already exists for this wc_order_id
-        $existingBooking = Booking::where('wc_order_id', $orderId)->first();
-
-        if ($existingBooking) {
-            return;
-        }
-
-        // Step 5: Verify slot availability
-        $available = $bookingService->verifyAvailability(
-            $meta['location_id'],
-            $meta['slot_start'],
-            $meta['slot_end'],
-        );
-
-        if (! $available) {
-            throw new RuntimeException(
-                'Slot unavailable for location '.$meta['location_id']
-                .' from '.$meta['slot_start'].' to '.$meta['slot_end']
-            );
-        }
-
-        // Step 6: Ensure a confirmed (non-cancellation) status exists
+        // Step 4: Ensure a confirmed (non-cancellation) status exists
         $confirmedStatus = BookingStatus::where('is_cancellation', false)->first();
 
         if ($confirmedStatus === null) {
@@ -200,8 +186,23 @@ class ProcessWooCommerceWebhook implements ShouldBeUnique, ShouldQueue
             ? Carbon::parse($data['date_paid'])
             : now();
 
-        // Step 7: Create booking and sale atomically
-        DB::transaction(function () use ($data, $orderId, $client, $meta, $confirmedStatus, $paidAt, $bookingService, $saleService) {
+        // Step 5: Lock the affected agenda before idempotency and availability checks.
+        $result = DB::transaction(function () use ($data, $orderId, $client, $meta, $confirmedStatus, $paidAt, $bookingService, $saleService, $schedulingLocks): array {
+            $schedulingLocks->lock($meta['location_id'], $client->id);
+
+            $existingBooking = Booking::where('wc_order_id', $orderId)->lockForUpdate()->first();
+            if ($existingBooking) {
+                return ['status' => 'existing'];
+            }
+
+            if (! $bookingService->verifyAvailability(
+                $meta['location_id'],
+                $meta['slot_start'],
+                $meta['slot_end'],
+            )) {
+                return ['status' => 'slot_unavailable'];
+            }
+
             $booking = $bookingService->findOrCreateBooking(
                 [
                     'wc_order_id' => $orderId,
@@ -229,34 +230,43 @@ class ProcessWooCommerceWebhook implements ShouldBeUnique, ShouldQueue
                 'payment_method' => $data['payment_method'] ?? 'online',
                 'paid_at' => $paidAt,
             ]);
+
+            return ['status' => 'created'];
         });
+
+        if ($result['status'] === 'slot_unavailable') {
+            throw new RuntimeException('Slot unavailable for location '.$meta['location_id']);
+        }
     }
 
     /**
      * Handle an order.refunded event — cancel the associated booking if it exists.
      */
-    private function handleOrderRefunded(array $data): void
+    private function handleOrderRefunded(array $data, SchedulingLockService $schedulingLocks): void
     {
         $orderId = $data['id'] ?? null;
-        $booking = Booking::where('wc_order_id', $orderId)->first();
 
-        if (! $booking) {
-            return;
-        }
+        DB::transaction(function () use ($orderId, $schedulingLocks): void {
+            $booking = Booking::where('wc_order_id', $orderId)->lockForUpdate()->first();
+            if (! $booking) {
+                return;
+            }
 
-        $cancelStatus = BookingStatus::where('is_cancellation', true)->first();
+            $schedulingLocks->lock($booking->location_id, $booking->client_id, $booking->provider_id);
+            $cancelStatus = BookingStatus::where('is_cancellation', true)->first();
 
-        if ($cancelStatus) {
-            $booking->update([
-                'status_id' => $cancelStatus->id,
-                'last_modified_via' => BookingSource::OnlineWebhook,
-            ]);
+            if ($cancelStatus && $booking->status_id !== $cancelStatus->id) {
+                $booking->update([
+                    'status_id' => $cancelStatus->id,
+                    'last_modified_via' => BookingSource::OnlineWebhook,
+                ]);
 
-            $booking->statusHistory()->create([
-                'status_id' => $cancelStatus->id,
-                'notes' => 'Cancelled via WooCommerce refund order #'.$orderId,
-            ]);
-        }
+                $booking->statusHistory()->create([
+                    'status_id' => $cancelStatus->id,
+                    'notes' => 'Cancelled via WooCommerce refund order #'.$orderId,
+                ]);
+            }
+        }, 3);
     }
 
     /**

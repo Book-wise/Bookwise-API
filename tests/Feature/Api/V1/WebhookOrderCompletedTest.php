@@ -157,6 +157,28 @@ class WebhookOrderCompletedTest extends TestCase
         ]);
     }
 
+    public function test_empty_webhook_secret_is_rejected_before_processing(): void
+    {
+        config(['services.woocommerce.webhook_secret' => '']);
+
+        $this->postJson('/api/v1/webhooks/woocommerce', $this->buildPayload())
+            ->assertStatus(503)
+            ->assertJsonPath('error', 'configuration_error');
+    }
+
+    public function test_webhook_log_excludes_billing_personal_data(): void
+    {
+        Queue::fake();
+        $payload = $this->buildPayload();
+
+        $this->sendWebhook($payload)->assertOk();
+
+        $log = WoocommerceWebhooksLog::latest('id')->firstOrFail();
+        $this->assertArrayNotHasKey('billing', $log->payload);
+        $this->assertArrayNotHasKey('shipping', $log->payload);
+        $this->assertSame($payload['id'], $log->payload['id']);
+    }
+
     // ── Controller: Job dispatch ────────────────────────────────────
 
     public function test_valid_webhook_dispatches_job(): void
@@ -284,6 +306,24 @@ class WebhookOrderCompletedTest extends TestCase
         $this->assertDatabaseCount('bookings', $bookingCount);
         $this->assertDatabaseCount('sales', $saleCount);
         $this->assertDatabaseCount('sale_transactions', $saleCount);
+    }
+
+    public function test_refund_replay_cancels_once_without_reversing_the_sale(): void
+    {
+        $payload = $this->buildPayload();
+        $this->runJob('order.completed', $payload);
+        $cancelled = BookingStatus::create(['name' => 'Cancelled', 'is_cancellation' => true]);
+
+        $refund = array_replace($payload, ['status' => 'refunded']);
+        $this->runJob('order.refunded', $refund);
+        $this->runJob('order.refunded', $refund);
+
+        $booking = Booking::where('wc_order_id', $payload['id'])->firstOrFail();
+        $sale = Sale::where('wc_order_id', $payload['id'])->firstOrFail();
+
+        $this->assertSame($cancelled->id, $booking->status_id);
+        $this->assertSame(2, $booking->statusHistory()->count());
+        $this->assertSame('50000.00', number_format((float) $sale->paid_amount, 2, '.', ''));
     }
 
     // ── Slot unavailable (job) ──────────────────────────────────────
