@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\Booking;
 use App\Models\BlockedSlot;
+use App\Models\Booking;
 use App\Models\Location;
 use App\Models\Service;
 use Carbon\Carbon;

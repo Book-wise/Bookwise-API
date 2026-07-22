@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\Location;
 use App\Models\Sale;
 use App\Models\Service;
+use App\Models\WoocommerceWebhooksLog;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Testing\TestResponse;
@@ -301,7 +302,7 @@ class WebhookOrderCompletedTest extends TestCase
 
         $this->sendWebhook($payload)->assertStatus(200);
 
-        $log = \App\Models\WoocommerceWebhooksLog::firstOrFail();
+        $log = WoocommerceWebhooksLog::firstOrFail();
         $storedPayload = $log->payload;
 
         $this->assertArrayNotHasKey('billing', $storedPayload);
