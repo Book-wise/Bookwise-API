@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\BlockedSlotController;
 use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\ClientController;
 use App\Http\Controllers\Api\V1\ClientPackController;
+use App\Http\Controllers\Api\V1\ConfigController;
 use App\Http\Controllers\Api\V1\CustomAttributeController;
 use App\Http\Controllers\Api\V1\LocationController;
 use App\Http\Controllers\Api\V1\PackSessionController;
@@ -15,6 +16,8 @@ use App\Http\Controllers\Api\V1\SaleController;
 use App\Http\Controllers\Api\V1\ServiceController;
 use App\Http\Controllers\Api\V1\ServicePackController;
 use App\Http\Controllers\Api\V1\WebhookController;
+use App\Models\BlockedSlot;
+use App\Models\Booking;
 use Illuminate\Support\Facades\Route;
 
 // Webhook WooCommerce — HMAC, sin Sanctum
@@ -29,6 +32,7 @@ Route::middleware('throttle:api_public')->prefix('v1')->group(function () {
 
 // Endpoints publicos — sin token
 Route::middleware('throttle:api_public')->prefix('v1')->group(function () {
+    Route::get('/config', [ConfigController::class, 'index']);
     Route::get('/available_slots', [AvailableSlotsController::class, 'index']);
     Route::get('/services', [ServiceController::class, 'index']);
     Route::get('/services/{id}', [ServiceController::class, 'show']);
@@ -45,14 +49,17 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
     Route::get('/bookings', [BookingController::class, 'index'])
         ->middleware('scope:bookings:read');
     Route::get('/bookings/{id}', [BookingController::class, 'show'])
-        ->middleware('scope:bookings:read');
+        ->middleware('scope:bookings:read')
+        ->middleware('ownership:'.Booking::class);
     Route::post('/bookings', [BookingController::class, 'store'])
         ->middleware('scope:bookings:write');
     Route::patch('/bookings/{id}', [BookingController::class, 'update'])
         ->middleware('scope:bookings:write')
-        ->middleware('role:provider,admin');
+        ->middleware('role:provider,admin')
+        ->middleware('ownership:'.Booking::class);
     Route::patch('/bookings/{id}/cancel', [BookingController::class, 'cancel'])
-        ->middleware('scope:bookings:write');
+        ->middleware('scope:bookings:write')
+        ->middleware('role:admin,agent,provider');
 
     // Clients
     Route::get('/clients', [ClientController::class, 'index'])
@@ -113,11 +120,14 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
     Route::post('/blocked-slots', [BlockedSlotController::class, 'store'])
         ->middleware('scope:bookings:write');
     Route::patch('/blocked-slots/{id}', [BlockedSlotController::class, 'update'])
-        ->middleware('scope:bookings:write');
+        ->middleware('scope:bookings:write')
+        ->middleware('ownership:'.BlockedSlot::class);
     Route::delete('/blocked-slots/{id}', [BlockedSlotController::class, 'destroy'])
-        ->middleware('scope:bookings:write');
+        ->middleware('scope:bookings:write')
+        ->middleware('ownership:'.BlockedSlot::class);
     Route::delete('/blocked-slots/group/{repeatGroupId}', [BlockedSlotController::class, 'destroyGroup'])
-        ->middleware('scope:bookings:write');
+        ->middleware('scope:bookings:write')
+        ->middleware('ownership:'.BlockedSlot::class.',repeatGroupId');
 
     // Me
     Route::get('/me', [ClientController::class, 'me'])->middleware('scope:clients:read');

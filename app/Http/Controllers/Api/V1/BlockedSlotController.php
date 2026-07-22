@@ -233,6 +233,8 @@ class BlockedSlotController extends Controller
     {
         $blockedSlot = BlockedSlot::findOrFail($id);
 
+        $this->authorize('update', $blockedSlot);
+
         $data = $request->validate([
             'start_time' => ['sometimes', 'date'],
             'end_time' => ['sometimes', 'date'],
@@ -412,7 +414,11 @@ class BlockedSlotController extends Controller
     // ── DELETE /v1/blocked-slots/:id ──────────────────────────────
     public function destroy(int $id): JsonResponse
     {
-        BlockedSlot::findOrFail($id)->delete();
+        $blockedSlot = BlockedSlot::findOrFail($id);
+
+        $this->authorize('delete', $blockedSlot);
+
+        $blockedSlot->delete();
 
         return response()->json(null, 204);
     }
@@ -420,6 +426,12 @@ class BlockedSlotController extends Controller
     // ── DELETE /v1/blocked-slots/group/:repeat_group_id ───────────
     public function destroyGroup(string $repeatGroupId): JsonResponse
     {
+        $slot = BlockedSlot::where('repeat_group_id', $repeatGroupId)->first();
+
+        if ($slot) {
+            $this->authorize('delete', $slot);
+        }
+
         BlockedSlot::where('repeat_group_id', $repeatGroupId)->delete();
 
         return response()->json(null, 204);

@@ -170,6 +170,8 @@ class ThisWeekBookingsSeeder extends Seeder
                     'start_time' => $startStr,
                     'end_time' => $endStr,
                     'price' => $price,
+                    'created_via' => 'admin_calendar',
+                    'last_modified_via' => 'admin_calendar',
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);

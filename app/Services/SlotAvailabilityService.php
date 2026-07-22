@@ -31,11 +31,16 @@ class SlotAvailabilityService
             ?? $service?->slot_interval_minutes
             ?? config('booking.slot_interval_minutes', 30);
 
-        // ── 2. Rango del día ───────────────────────────────────────
+        // ── 2. Rango del día (timezone-aware) ──────────────────────
         $location = Location::findOrFail($locationId);
+        $locationTz = new \DateTimeZone($location->timezone);
         $date = Carbon::parse($startDate);
-        $dayStart = $date->copy()->setTimeFromTimeString($location->opening_time ?? '09:00:00');
-        $dayEnd = $date->copy()->setTimeFromTimeString($location->closing_time ?? '19:00:00');
+        $dayStart = Carbon::parse($date->format('Y-m-d'), $locationTz)
+            ->setTimeFromTimeString($location->opening_time ?? '09:00:00')
+            ->setTimezone('UTC');
+        $dayEnd = Carbon::parse($date->format('Y-m-d'), $locationTz)
+            ->setTimeFromTimeString($location->closing_time ?? '19:00:00')
+            ->setTimezone('UTC');
 
         // ── 3. Reservas activas del día ────────────────────────────
         $existingBookings = Booking::with('status')

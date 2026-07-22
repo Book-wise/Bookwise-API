@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\BookingSource;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -16,6 +17,7 @@ class Booking extends Model
         'location_id', 'status_id', 'start_time',
         'end_time', 'custom_duration_minutes',
         'price', 'notes', 'wc_order_id',
+        'created_via', 'last_modified_via',
     ];
 
     protected $casts = [
@@ -23,6 +25,8 @@ class Booking extends Model
         'end_time' => 'datetime',
         'price' => 'decimal:2',
         'custom_duration_minutes' => 'integer',
+        'created_via' => BookingSource::class,
+        'last_modified_via' => BookingSource::class,
     ];
 
     // ── Relaciones ─────────────────────────────────────────────────
@@ -99,6 +103,6 @@ class Booking extends Model
     {
         return $this->custom_duration_minutes
             ?? $this->service?->duration_minutes
-            ?? (int) env('BOOKING_DEFAULT_DURATION_MINUTES', 30);
+            ?? (int) config('booking.default_duration_minutes', 30);
     }
 }
