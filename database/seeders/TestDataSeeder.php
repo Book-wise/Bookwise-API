@@ -199,6 +199,8 @@ class TestDataSeeder extends Seeder
                 'start_time' => $start,
                 'end_time' => $end,
                 'price' => $price,
+                'created_via' => 'admin_calendar',
+                'last_modified_via' => 'admin_calendar',
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

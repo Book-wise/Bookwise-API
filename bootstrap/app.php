@@ -3,6 +3,7 @@
 use App\Http\Middleware\CheckOwnership;
 use App\Http\Middleware\CheckTokenScope;
 use App\Http\Middleware\CheckUserRole;
+use App\Providers\AuthServiceProvider;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -21,6 +22,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'ownership' => CheckOwnership::class,
         ]);
     })
+    ->withProviders([
+        AuthServiceProvider::class,
+    ])
     ->withExceptions(function (Exceptions $exceptions): void {
         //
     })->create();

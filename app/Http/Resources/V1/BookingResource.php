@@ -18,6 +18,8 @@ class BookingResource extends JsonResource
             'price' => $this->price,
             'notes' => $this->notes,
             'wc_order_id' => $this->wc_order_id,
+            'created_via' => $this->created_via?->value,
+            'last_modified_via' => $this->when($this->last_modified_via, fn () => $this->last_modified_via->value),
             'created_at' => $this->created_at?->toIso8601String(),
             'client' => new ClientResource($this->whenLoaded('client')),
             'service' => new ServiceResource($this->whenLoaded('service')),

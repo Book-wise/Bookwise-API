@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\BookingSource;
 use App\Models\Booking;
 use Carbon\Carbon;
 
@@ -22,8 +23,11 @@ class BookingService
     /**
      * Find an existing booking by wc_order_id or create a new one.
      * Provides idempotency: if a booking with the given wc_order_id exists, returns it.
+     *
+     * @param  array  $data  Booking data
+     * @param  BookingSource|null  $createdVia  Source to set on creation. Only set on first creation, never on replay.
      */
-    public function findOrCreateBooking(array $data): Booking
+    public function findOrCreateBooking(array $data, ?BookingSource $createdVia = BookingSource::OnlineWebhook): Booking
     {
         $existing = Booking::where('wc_order_id', $data['wc_order_id'])->first();
 
@@ -43,6 +47,8 @@ class BookingService
             'price' => $data['price'] ?? 0,
             'notes' => $data['notes'] ?? null,
             'provider_id' => null,
+            'created_via' => $createdVia,
+            'last_modified_via' => $createdVia,
         ]);
     }
 }

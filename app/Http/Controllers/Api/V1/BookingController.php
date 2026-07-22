@@ -2,18 +2,38 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\BookingSource;
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\BookingStoreRequest;
+use App\Http\Requests\BookingUpdateRequest;
 use App\Http\Resources\V1\BookingResource;
 use App\Models\Booking;
 use App\Models\BookingStatus;
 use App\Models\Location;
 use App\Models\Service;
+use App\Models\ServicePack;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class BookingController extends Controller
 {
+    // ── Role → BookingSource ───────────────────────────────────────
+
+    /**
+     * Map the authenticated user's role to a BookingSource value.
+     * Admin / provider → admin_calendar, agent → agent, fallback → admin_calendar.
+     */
+    private function resolveBookingSource(User $user): BookingSource
+    {
+        return match ($user->role) {
+            UserRole::AGENT => BookingSource::Agent,
+            default => BookingSource::AdminCalendar,
+        };
+    }
+
     // ── GET /v1/bookings ───────────────────────────────────────────
     public function index(Request $request): JsonResponse
     {
@@ -21,10 +41,9 @@ class BookingController extends Controller
 
         $bookings = Booking::with(['client', 'service', 'provider', 'location', 'status', 'sale', 'packSession.clientPack'])
             // Provider filter: only show bookings for their locations
-            ->when($user?->role?->value === 'provider', function ($query) use ($user) {
-                $provider = $user->provider;
-                if ($provider) {
-                    $locationIds = $provider->locations->pluck('id')->toArray();
+            ->when($user?->role?->value === 'provider', function ($query) use ($request) {
+                $locationIds = $request->attributes->get('provider_location_ids', []);
+                if (! empty($locationIds)) {
                     $query->whereIn('location_id', $locationIds);
                 }
             })
@@ -48,35 +67,51 @@ class BookingController extends Controller
         $booking = Booking::with(['client', 'service', 'provider', 'location', 'status', 'statusHistory.status', 'sale', 'packSession.clientPack'])
             ->findOrFail($id);
 
+        $this->authorize('view', $booking);
+
         return response()->json(['data' => new BookingResource($booking)]);
     }
 
     // ── POST /v1/bookings ──────────────────────────────────────────
-    public function store(Request $request): JsonResponse
+    public function store(BookingStoreRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'start_time' => ['required', 'date', 'after:now'],
-            'end_time' => ['nullable', 'date', 'after:start_time'],
-            'service_id' => ['required', 'integer', 'exists:services,id'],
-            'provider_id' => ['nullable', 'integer', 'exists:providers,id'],
-            'client_id' => ['required', 'integer', 'exists:clients,id'],
-            'location_id' => ['required', 'integer', 'exists:locations,id'],
-            'status_id' => ['required', 'integer', 'exists:booking_statuses,id'],
-            'price' => ['nullable', 'numeric', 'min:0'],
-            'notes' => ['nullable', 'string', 'max:1000'],
-            'duration_minutes' => ['nullable', 'integer', 'min:15', 'max:480'],
-            'wc_order_id' => ['nullable', 'integer'],
-        ]);
+        $validated = $request->validated();
 
-        $service = Service::findOrFail($validated['service_id']);
+        // Resolve service: direct or from a service_pack
+        $serviceId = $validated['service_id'] ?? null;
+        $servicePackId = $validated['service_pack_id'] ?? null;
 
+        if ($serviceId && $servicePackId) {
+            return response()->json([
+                'error' => 'validation',
+                'detail' => 'Provide either service_id or service_pack_id, not both.',
+            ], 422);
+        }
+
+        if (! $serviceId && ! $servicePackId) {
+            return response()->json([
+                'error' => 'validation',
+                'detail' => 'Service is required. Provide either service_id or service_pack_id.',
+            ], 422);
+        }
+
+        $service = $serviceId
+            ? Service::findOrFail($serviceId)
+            : ServicePack::findOrFail($servicePackId)->service;
+
+        $validated['service_id'] = $service->id;
+        unset($validated['service_pack_id']);
+
+        // Parse start_time in the location's timezone,
+        // then convert to app timezone for consistent storage.
         $location = Location::findOrFail($validated['location_id']);
         $startTime = $this->parseInLocationTimezone($validated['start_time'], $location);
         $validated['start_time'] = $startTime;
 
+        // Effective duration: use explicit duration, service default, or fallback
         $effectiveDuration = $validated['duration_minutes']
             ?? $service->duration_minutes
-            ?? (int) env('BOOKING_DEFAULT_DURATION_MINUTES', 30);
+            ?? (int) config('booking.default_duration_minutes', 30);
 
         $endTime = isset($validated['end_time'])
             ? $this->parseInLocationTimezone($validated['end_time'], $location)
@@ -108,11 +143,15 @@ class BookingController extends Controller
             ], 409);
         }
 
+        $source = $this->resolveBookingSource($request->user());
+
         $booking = Booking::create([
             ...$validated,
             'end_time' => $endTime,
             'custom_duration_minutes' => $validated['duration_minutes'] ?? null,
             'price' => $validated['price'] ?? $service->price,
+            'created_via' => $source,
+            'last_modified_via' => $source,
         ]);
 
         $booking->load(['client', 'service', 'provider', 'location', 'status']);
@@ -121,18 +160,13 @@ class BookingController extends Controller
     }
 
     // ── PATCH /v1/bookings/{id} ────────────────────────────────────
-    public function update(Request $request, int $id): JsonResponse
+    public function update(BookingUpdateRequest $request, int $id): JsonResponse
     {
         $booking = Booking::findOrFail($id);
 
-        $validated = $request->validate([
-            'start_time' => ['sometimes', 'date', 'after:now'],
-            'end_time' => ['sometimes', 'date', 'after:start_time'],
-            'status_id' => ['sometimes', 'integer', 'exists:booking_statuses,id'],
-            'price' => ['sometimes', 'numeric', 'min:0'],
-            'notes' => ['sometimes', 'nullable', 'string', 'max:1000'],
-            'provider_id' => ['sometimes', 'nullable', 'integer', 'exists:providers,id'],
-        ]);
+        $this->authorize('update', $booking);
+
+        $validated = $request->validated();
 
         // Check for booking overlaps if time, location, or client is being changed
         if (isset($validated['start_time']) || isset($validated['end_time'])
@@ -184,7 +218,10 @@ class BookingController extends Controller
             }
         }
 
-        $booking->update($validated);
+        $booking->update([
+            ...$validated,
+            'last_modified_via' => $this->resolveBookingSource($request->user()),
+        ]);
         $booking->load(['client', 'service', 'provider', 'location', 'status']);
 
         return response()->json(['data' => new BookingResource($booking)]);
@@ -194,6 +231,8 @@ class BookingController extends Controller
     public function cancel(Request $request, int $id): JsonResponse
     {
         $booking = Booking::findOrFail($id);
+
+        $this->authorize('cancel', $booking);
 
         $cancelStatus = BookingStatus::where('is_cancellation', true)->firstOrFail();
 
@@ -205,7 +244,10 @@ class BookingController extends Controller
             ], 422);
         }
 
-        $booking->update(['status_id' => $cancelStatus->id]);
+        $booking->update([
+            'status_id' => $cancelStatus->id,
+            'last_modified_via' => $this->resolveBookingSource($request->user()),
+        ]);
 
         // Registrar en historial
         $booking->statusHistory()->create([

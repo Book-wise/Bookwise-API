@@ -41,12 +41,12 @@ class Service extends Model
     public function getEffectiveDurationMinutesAttribute(): int
     {
         return $this->duration_minutes
-            ?? (int) env('BOOKING_DEFAULT_DURATION_MINUTES', 30);
+            ?? (int) config('booking.default_duration_minutes', 30);
     }
 
     public function getEffectiveSlotIntervalAttribute(): int
     {
         return $this->slot_interval_minutes
-            ?? (int) env('BOOKING_SLOT_INTERVAL_MINUTES', 30);
+            ?? (int) config('booking.slot_interval_minutes', 30);
     }
 }

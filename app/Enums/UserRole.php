@@ -22,7 +22,7 @@ enum UserRole: string
             self::PROVIDER => ['bookings:read', 'bookings:write', 'clients:read'],
             self::WOOCOMMERCE => ['clients:read', 'clients:write', 'bookings:read', 'bookings:write'],
             self::CLIENT => ['clients:read'],
-            self::AGENT => ['bookings:read', 'clients:read', 'clients:write', 'providers:read'],
+            self::AGENT => ['bookings:read', 'bookings:write', 'clients:read', 'clients:write', 'providers:read'],
         };
     }
 }

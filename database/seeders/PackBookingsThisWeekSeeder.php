@@ -79,6 +79,8 @@ class PackBookingsThisWeekSeeder extends Seeder
                 'start_time' => $sess[0],
                 'end_time' => $sess[1],
                 'price' => 35000,
+                'created_via' => 'admin_calendar',
+                'last_modified_via' => 'admin_calendar',
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -140,6 +142,8 @@ class PackBookingsThisWeekSeeder extends Seeder
                 'start_time' => $slot[0],
                 'end_time' => $slot[1],
                 'price' => 40000,
+                'created_via' => 'admin_calendar',
+                'last_modified_via' => 'admin_calendar',
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -201,6 +205,8 @@ class PackBookingsThisWeekSeeder extends Seeder
                 'start_time' => $slot[0],
                 'end_time' => $slot[1],
                 'price' => 45000,
+                'created_via' => 'admin_calendar',
+                'last_modified_via' => 'admin_calendar',
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
