@@ -34,12 +34,10 @@ class SlotAvailabilityService
         // ── 2. Rango del día (timezone-aware) ──────────────────────
         $location = Location::findOrFail($locationId);
         $locationTz = new \DateTimeZone($location->timezone);
-        $date = Carbon::parse($startDate);
-        $dayStart = Carbon::parse($date->format('Y-m-d'), $locationTz)
-            ->setTimeFromTimeString($location->opening_time ?? '09:00:00')
+        $date = Carbon::parse($startDate, $locationTz);
+        $dayStart = (clone $date)->setTimeFromTimeString($location->opening_time ?? '09:00:00')
             ->setTimezone('UTC');
-        $dayEnd = Carbon::parse($date->format('Y-m-d'), $locationTz)
-            ->setTimeFromTimeString($location->closing_time ?? '19:00:00')
+        $dayEnd = (clone $date)->setTimeFromTimeString($location->closing_time ?? '19:00:00')
             ->setTimezone('UTC');
 
         // ── 3. Reservas activas del día ────────────────────────────

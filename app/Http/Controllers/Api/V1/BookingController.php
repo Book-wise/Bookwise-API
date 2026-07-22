@@ -77,7 +77,7 @@ class BookingController extends Controller
     {
         $validated = $request->validated();
 
-        // Resolver servicio: directo o desde un service_pack
+        // Resolve service: direct or from a service_pack
         $serviceId = $validated['service_id'] ?? null;
         $servicePackId = $validated['service_pack_id'] ?? null;
 
@@ -99,19 +99,13 @@ class BookingController extends Controller
             ? Service::findOrFail($serviceId)
             : ServicePack::findOrFail($servicePackId)->service;
 
-        // Inyectar service_id en los datos de creación y limpiar service_pack_id
         $validated['service_id'] = $service->id;
         unset($validated['service_pack_id']);
 
-        // Interpretar start_time con el timezone de la location
-        // Si start_time trae offset explícito (UTC), Carbon lo respeta.
-        // Si no trae offset, se interpreta como hora local de la sucursal.
-        // Se convierte a America/Santiago (app.timezone) para almacenamiento
-        // consistente con el resto de la base de datos.
+        // Parse start_time in the location's timezone,
+        // then convert to app timezone for consistent storage.
         $location = Location::findOrFail($validated['location_id']);
-        $locationTz = new \DateTimeZone($location->timezone);
-        $startTime = Carbon::parse($validated['start_time'], $locationTz)
-            ->setTimezone(config('app.timezone'));
+        $startTime = $this->parseInLocationTimezone($validated['start_time'], $location);
         $validated['start_time'] = $startTime;
 
         // Effective duration: use explicit duration, service default, or fallback
@@ -120,8 +114,10 @@ class BookingController extends Controller
             ?? (int) config('booking.default_duration_minutes', 30);
 
         $endTime = isset($validated['end_time'])
-            ? Carbon::parse($validated['end_time'], $locationTz)->setTimezone(config('app.timezone'))
+            ? $this->parseInLocationTimezone($validated['end_time'], $location)
             : $startTime->copy()->addMinutes($effectiveDuration);
+
+        $validated['end_time'] = $endTime;
 
         // Check for booking overlaps (location or client)
         $conflict = $this->checkBookingOverlap(
@@ -176,26 +172,24 @@ class BookingController extends Controller
         if (isset($validated['start_time']) || isset($validated['end_time'])
             || isset($validated['location_id']) || isset($validated['client_id'])) {
 
-            // Resolve the effective location for timezone-aware parsing
             $locationId = isset($validated['location_id'])
                 ? $validated['location_id']
                 : $booking->location_id;
 
-            $locationTz = new \DateTimeZone(Location::findOrFail($locationId)->timezone);
+            $location = Location::findOrFail($locationId);
 
             $startTime = isset($validated['start_time'])
-                ? Carbon::parse($validated['start_time'], $locationTz)->setTimezone(config('app.timezone'))
+                ? $this->parseInLocationTimezone($validated['start_time'], $location)
                 : $booking->start_time;
 
             $endTime = isset($validated['end_time'])
-                ? Carbon::parse($validated['end_time'], $locationTz)->setTimezone(config('app.timezone'))
+                ? $this->parseInLocationTimezone($validated['end_time'], $location)
                 : ($booking->end_time ?? $startTime->copy()->addMinutes($booking->effective_duration_minutes));
 
             $clientId = isset($validated['client_id'])
                 ? $validated['client_id']
                 : $booking->client_id;
 
-            // Persist the timezone-converted values so they are stored correctly
             $validated['start_time'] = $startTime;
             $validated['end_time'] = $endTime;
 
@@ -297,5 +291,22 @@ class BookingController extends Controller
             ->first();
 
         return $clientConflict;
+    }
+
+    // ── Private: Parse datetime in location timezone ───────────────────
+
+    /**
+     * Parse a datetime string using the location's timezone and convert
+     * to the application's default timezone for storage consistency.
+     *
+     * If the datetime has an explicit UTC offset (e.g. "Z", "+00:00"),
+     * Carbon respects it and the location timezone is used only for the
+     * final conversion. If no offset is present, the location timezone
+     * is used to interpret the datetime as local time.
+     */
+    private function parseInLocationTimezone(string $datetime, Location $location): Carbon
+    {
+        return Carbon::parse($datetime, new \DateTimeZone($location->timezone))
+            ->setTimezone(config('app.timezone'));
     }
 }

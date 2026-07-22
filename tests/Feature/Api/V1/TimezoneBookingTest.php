@@ -85,20 +85,13 @@ class TimezoneBookingTest extends TestCase
         $this->withHeader('Authorization', 'Bearer '.$token->plainTextToken);
     }
 
-    private function futureLocalDate(): string
-    {
-        // Retorna una fecha-hora local 3 días en el futuro para evitar
-        // conflictos con la validación after:now
-        return Carbon::now()->addDays(3)->format('Y-m-d').' 09:00';
-    }
-
     // ── POST booking con start_time LOCAL (sin offset) ────────────
 
     public function test_punta_arenas_local_time_is_interpreted_as_utc_minus_3(): void
     {
-        // Enviar "2026-01-15 09:00" sin offset → debe interpretarse como
+        // Enviar "2027-01-15 09:00" sin offset → debe interpretarse como
         // 09:00 Punta Arenas (UTC-3) → 12:00 UTC → 09:00 Santiago (UTC-3, verano)
-        $startLocal = '2026-01-15 09:00';
+        $startLocal = '2027-01-15 09:00';
 
         $response = $this->postJson('/api/v1/bookings', [
             'start_time' => $startLocal,
@@ -115,14 +108,14 @@ class TimezoneBookingTest extends TestCase
 
         // Verano: Punta Arenas y Santiago comparten UTC-3
         // 09:00 Punta Arenas = 12:00 UTC = 09:00 Santiago (misma hora)
-        $this->assertSame('2026-01-15 09:00:00', $booking->start_time->format('Y-m-d H:i:s'));
+        $this->assertSame('2027-01-15 09:00:00', $booking->start_time->format('Y-m-d H:i:s'));
     }
 
     public function test_santiago_winter_local_time_is_interpreted_as_utc_minus_4(): void
     {
         // Junio: Santiago UTC-4, 09:00 local
         // Ya está en Santiago timezone, se almacena tal cual
-        $startLocal = '2026-06-15 09:00';
+        $startLocal = '2027-06-15 09:00';
 
         $response = $this->postJson('/api/v1/bookings', [
             'start_time' => $startLocal,
@@ -137,13 +130,13 @@ class TimezoneBookingTest extends TestCase
         $booking = Booking::find($response->json('data.id'));
         $this->assertNotNull($booking);
 
-        $this->assertSame('2026-06-15 09:00:00', $booking->start_time->format('Y-m-d H:i:s'));
+        $this->assertSame('2027-06-15 09:00:00', $booking->start_time->format('Y-m-d H:i:s'));
     }
 
     public function test_santiago_summer_local_time_is_interpreted_as_utc_minus_3(): void
     {
         // Enero: Santiago UTC-3, 09:00 local
-        $startLocal = '2026-01-15 09:00';
+        $startLocal = '2027-01-15 09:00';
 
         $response = $this->postJson('/api/v1/bookings', [
             'start_time' => $startLocal,
@@ -158,7 +151,7 @@ class TimezoneBookingTest extends TestCase
         $booking = Booking::find($response->json('data.id'));
         $this->assertNotNull($booking);
 
-        $this->assertSame('2026-01-15 09:00:00', $booking->start_time->format('Y-m-d H:i:s'));
+        $this->assertSame('2027-01-15 09:00:00', $booking->start_time->format('Y-m-d H:i:s'));
     }
 
     // ── POST booking con start_time en UTC (con offset explícito) ─
@@ -167,7 +160,7 @@ class TimezoneBookingTest extends TestCase
     {
         // Cuando el frontend envía UTC (desde slot picker), Carbon respeta el offset
         // 15:00 UTC = 12:00 Santiago (UTC-3, verano)
-        $startUtc = '2026-01-15T15:00:00Z';
+        $startUtc = '2027-01-15T15:00:00Z';
 
         $response = $this->postJson('/api/v1/bookings', [
             'start_time' => $startUtc,
@@ -183,7 +176,7 @@ class TimezoneBookingTest extends TestCase
         $this->assertNotNull($booking);
 
         // 15:00 UTC = 12:00 Santiago (verano, UTC-3)
-        $this->assertSame('2026-01-15 12:00:00', $booking->start_time->format('Y-m-d H:i:s'));
+        $this->assertSame('2027-01-15 12:00:00', $booking->start_time->format('Y-m-d H:i:s'));
     }
 
     // ── Diferencia de 1h entre Santiago y Punta Arenas en invierno ─
@@ -201,7 +194,7 @@ class TimezoneBookingTest extends TestCase
             'active' => true,
         ]);
 
-        $startLocal = '2026-06-15 09:00';
+        $startLocal = '2027-06-15 09:00';
 
         $paResponse = $this->postJson('/api/v1/bookings', [
             'start_time' => $startLocal,
@@ -226,9 +219,9 @@ class TimezoneBookingTest extends TestCase
         $this->assertNotNull($stgBooking);
 
         // 09:00 Punta Arenas = 12:00 UTC = 08:00 Santiago
-        $this->assertSame('2026-06-15 08:00:00', $paBooking->start_time->format('Y-m-d H:i:s'));
+        $this->assertSame('2027-06-15 08:00:00', $paBooking->start_time->format('Y-m-d H:i:s'));
         // 09:00 Santiago = 09:00 Santiago (same timezone)
-        $this->assertSame('2026-06-15 09:00:00', $stgBooking->start_time->format('Y-m-d H:i:s'));
+        $this->assertSame('2027-06-15 09:00:00', $stgBooking->start_time->format('Y-m-d H:i:s'));
     }
 
     // ── Misma hora en verano ──────────────────────────────────────
@@ -244,7 +237,7 @@ class TimezoneBookingTest extends TestCase
             'active' => true,
         ]);
 
-        $startLocal = '2026-01-15 09:00';
+        $startLocal = '2027-01-15 09:00';
 
         $paResponse = $this->postJson('/api/v1/bookings', [
             'start_time' => $startLocal,
@@ -269,15 +262,15 @@ class TimezoneBookingTest extends TestCase
         $this->assertNotNull($stgBooking);
 
         // Ambos son 09:00 porque comparten UTC-3 en verano
-        $this->assertSame('2026-01-15 09:00:00', $paBooking->start_time->format('Y-m-d H:i:s'));
-        $this->assertSame('2026-01-15 09:00:00', $stgBooking->start_time->format('Y-m-d H:i:s'));
+        $this->assertSame('2027-01-15 09:00:00', $paBooking->start_time->format('Y-m-d H:i:s'));
+        $this->assertSame('2027-01-15 09:00:00', $stgBooking->start_time->format('Y-m-d H:i:s'));
     }
 
     // ── Booking response muestra start_time en ISO8601 ─────────────
 
     public function test_booking_response_start_time_is_iso8601_with_correct_time(): void
     {
-        $startLocal = '2026-01-15 09:00';
+        $startLocal = '2027-01-15 09:00';
 
         $response = $this->postJson('/api/v1/bookings', [
             'start_time' => $startLocal,
@@ -296,6 +289,6 @@ class TimezoneBookingTest extends TestCase
         // Parsear como ISO8601 y verificar que corresponde al instante correcto
         // 09:00 Punta Arenas (UTC-3) = 12:00 UTC
         $parsed = Carbon::parse($startTime);
-        $this->assertSame('2026-01-15 12:00:00', $parsed->setTimezone('UTC')->format('Y-m-d H:i:s'));
+        $this->assertSame('2027-01-15 12:00:00', $parsed->setTimezone('UTC')->format('Y-m-d H:i:s'));
     }
 }

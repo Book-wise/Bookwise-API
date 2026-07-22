@@ -56,13 +56,6 @@ class TimezoneSlotsTest extends TestCase
     public function test_punta_arenas_slot_offset_utc_minus_3(): void
     {
         // Usamos junio (invierno en Chile) — Punta Arenas sigue UTC-3
-        $response = $this->getJson('/api/v1/available_slots', [
-            'location_id' => $this->puntaArenas->id,
-            'start_date' => '2026-06-15',
-            'service_id' => $this->service->id,
-        ]);
-
-        // El test anterior no manda query params; es GET con query string
         $response = $this->getJson(
             '/api/v1/available_slots?location_id='.$this->puntaArenas->id
             .'&start_date=2026-06-15'
