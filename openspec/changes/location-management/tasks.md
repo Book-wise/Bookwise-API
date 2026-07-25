@@ -40,14 +40,14 @@ Chain strategy: pending
 
 ## Phase 2: Core — Controllers + Routes + Tests
 
-- [ ] 2.1 Add `store()` to `LocationController` — validate name unique, region_id exists, auto-resolve timezone, return 201 + "Sucursal creada exitosamente"
-- [ ] 2.2 Enhance `update()` in `LocationController` — if `active` changing to `false` without `force`: run preflight; conflicts → 409 with `requires_confirmation` + `affects.bookings[]`; else update normally
-- [ ] 2.3 Handle `force: true` in `update()` — bypass preflight, `Log::warning` with user + timestamp + booking count, return 200 with warning message
-- [ ] 2.4 Update `LocationResource` — expose `opening_time`, `closing_time`, nested `region` (`{id, name, timezone}`), nested `comuna` (`{id, name}`)
-- [ ] 2.5 Add routes: `POST /v1/locations` (scope:bookings:write), `GET /v1/regions` (public), `GET /v1/regions/{id}/comunas` (public)
-- [ ] 2.6 Unit test `LocationService@resolveTimezone` — returns America/Santiago for Metropolitana, America/Punta_Arenas for Magallanes, throws for invalid
-- [ ] 2.7 Unit test `LocationService@checkDeactivationPreflight` — returns empty array when no future bookings, returns booking list when conflicts exist
-- [ ] 2.8 Feature test `POST /v1/locations` — 201 with valid data, 422 duplicate name, 422 invalid region_id
-- [ ] 2.9 Feature test `PATCH /v1/locations/{id}` — 200 partial update, 200 activate, 409 deactivate with conflicts, 200 force deactivate
-- [ ] 2.10 Feature test `GET /v1/regions` — returns 16 regions sorted, includes timezone
-- [ ] 2.11 Feature test `GET /v1/regions/{id}/comunas` — returns only that region's comunas, empty array if region has none
+- [x] 2.1 Add `store()` to `LocationController` — validate name unique, region_id exists, auto-resolve timezone, return 201 + "Sucursal creada exitosamente"
+- [x] 2.2 Enhance `update()` in `LocationController` — if `active` changing to `false` without `force`: run preflight; conflicts → 409 with `requires_confirmation` + `affects.bookings[]`; else update normally
+- [x] 2.3 Handle `force: true` in `update()` — bypass preflight, `Log::warning` with user + timestamp + booking count, return 200 with warning message
+- [x] 2.4 Update `LocationResource` — expose `opening_time`, `closing_time`, nested `region` (`{id, name, timezone}`), nested `comuna` (`{id, name}`)
+- [x] 2.5 Add routes: `POST /v1/locations` (scope:bookings:write), `GET /v1/regions` (public), `GET /v1/regions/{id}/comunas` (public)
+- [x] 2.6 Unit test `LocationService@resolveTimezone` — returns America/Santiago for Metropolitana, America/Punta_Arenas for Magallanes, throws for invalid
+- [x] 2.7 Unit test `LocationService@checkDeactivationPreflight` — returns empty array when no future bookings, returns booking list when conflicts exist
+- [x] 2.8 Feature test `POST /v1/locations` — 201 with valid data, 422 duplicate name, 422 invalid region_id
+- [x] 2.9 Feature test `PATCH /v1/locations/{id}` — 200 partial update, 200 activate, 409 deactivate with conflicts, 200 force deactivate
+- [x] 2.10 Feature test `GET /v1/regions` — returns 16 regions sorted, includes timezone
+- [x] 2.11 Feature test `GET /v1/regions/{id}/comunas` — returns only that region's comunas, empty array if region has none

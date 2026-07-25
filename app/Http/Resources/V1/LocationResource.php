@@ -16,6 +16,17 @@ class LocationResource extends JsonResource
             'city' => $this->city,
             'timezone' => $this->timezone,
             'active' => $this->active,
+            'opening_time' => $this->opening_time,
+            'closing_time' => $this->closing_time,
+            'region' => $this->whenLoaded('region', fn () => [
+                'id' => $this->region->id,
+                'name' => $this->region->name,
+                'timezone' => $this->region->timezone,
+            ]),
+            'comuna' => $this->whenLoaded('comuna', fn () => [
+                'id' => $this->comuna->id,
+                'name' => $this->comuna->name,
+            ]),
         ];
     }
 }

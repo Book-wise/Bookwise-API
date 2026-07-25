@@ -33,6 +33,6 @@ class RegionSeeder extends Seeder
 
         DB::table('regions')->insert($data);
 
-        $this->command?->info('Seeded ' . count($regions) . ' Chilean regions.');
+        $this->command?->info('Seeded '.count($regions).' Chilean regions.');
     }
 }

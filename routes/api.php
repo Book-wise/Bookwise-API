@@ -80,6 +80,13 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
     Route::get('/clients/{id}/packs', [ClientPackController::class, 'clientPacks'])
         ->middleware('scope:clients:read');
 
+    // Locations
+    Route::post('/locations', [LocationController::class, 'store'])
+        ->middleware('scope:bookings:write');
+    Route::patch('/locations/{id}', [LocationController::class, 'update'])
+        ->middleware('scope:bookings:write')
+        ->middleware('role:admin');
+
     // Providers
     Route::get('/providers', [ProviderController::class, 'index'])
         ->middleware('scope:providers:read');
