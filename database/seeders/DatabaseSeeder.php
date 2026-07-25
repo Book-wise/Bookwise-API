@@ -14,6 +14,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call(RegionSeeder::class);
+        $this->call(ComunaSeeder::class);
+
         $this->call(TestDataSeeder::class);
         $this->call(ThisWeekBookingsSeeder::class);
         $this->call(JuneBookingsSeeder::class);
