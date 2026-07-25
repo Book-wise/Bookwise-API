@@ -4,13 +4,14 @@ namespace App\Services;
 
 use App\Models\Booking;
 use App\Models\Region;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class LocationService
 {
     /**
      * Resolve the timezone string for a given region.
      *
-     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
+     * @throws ModelNotFoundException
      */
     public function resolveTimezone(int $regionId): string
     {
@@ -27,7 +28,7 @@ class LocationService
     {
         $conflictingBookings = Booking::where('location_id', $locationId)
             ->where('start_time', '>', now())
-            ->whereHas('status', fn ($q) => $q->where('is_cancellation', false))
+            ->whereHas('status', fn ($q) => $q->where('is_cancellation', false)->where('is_finalized', false))
             ->with(['provider', 'location', 'status'])
             ->get();
 
