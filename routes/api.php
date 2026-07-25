@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\CustomAttributeController;
 use App\Http\Controllers\Api\V1\LocationController;
 use App\Http\Controllers\Api\V1\PackSessionController;
 use App\Http\Controllers\Api\V1\ProviderController;
+use App\Http\Controllers\Api\V1\RegionController;
 use App\Http\Controllers\Api\V1\SaleController;
 use App\Http\Controllers\Api\V1\ServiceController;
 use App\Http\Controllers\Api\V1\ServicePackController;
@@ -38,6 +39,8 @@ Route::middleware('throttle:api_public')->prefix('v1')->group(function () {
     Route::get('/services/{id}', [ServiceController::class, 'show']);
     Route::get('/locations', [LocationController::class, 'index']);
     Route::get('/locations/{id}', [LocationController::class, 'show']);
+    Route::get('/regions', [RegionController::class, 'index']);
+    Route::get('/regions/{id}/comunas', [RegionController::class, 'showComunas']);
     Route::get('/packs', [ServicePackController::class, 'index']);
     Route::get('/packs/{id}', [ServicePackController::class, 'show']);
 });
