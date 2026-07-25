@@ -18,7 +18,7 @@ class LocationController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $locations = Location::query()
+        $locations = Location::with('region', 'comuna')
             ->when($request->active !== null, fn ($q) => $q->where('active', filter_var($request->active, FILTER_VALIDATE_BOOLEAN)))
             ->orderBy('name')
             ->paginate($request->per_page ?? 15);
