@@ -4,15 +4,13 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LocationStoreRequest;
+use App\Http\Requests\LocationUpdateRequest;
 use App\Http\Resources\V1\LocationResource;
-use App\Models\Comuna;
 use App\Models\Location;
 use App\Services\LocationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 
 class LocationController extends Controller
 {
@@ -65,44 +63,9 @@ class LocationController extends Controller
         return response()->json(['data' => new LocationResource($location)]);
     }
 
-    public function update(Request $request, int $id, LocationService $locationService): JsonResponse
+    public function update(LocationUpdateRequest $request, int $id, LocationService $locationService): JsonResponse
     {
         $location = Location::findOrFail($id);
-
-        $rules = [
-            'name' => ['sometimes', 'string', 'max:255', Rule::unique('locations')->ignore($id)],
-            'address' => ['sometimes', 'nullable', 'string', 'max:500'],
-            'city' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'region_id' => ['sometimes', 'integer', 'exists:regions,id'],
-            'comuna_id' => ['sometimes', 'nullable', 'integer', 'exists:comunas,id'],
-            'opening_time' => ['sometimes', 'nullable', 'string', 'date_format:H:i:s'],
-            'closing_time' => ['sometimes', 'nullable', 'string', 'date_format:H:i:s'],
-            'active' => ['sometimes', 'boolean'],
-            'force' => ['sometimes', 'boolean'],
-        ];
-
-        $validator = Validator::make($request->all(), $rules);
-
-        $validator->after(function ($v) use ($request, $location) {
-            if ($v->errors()->has('region_id') || $v->errors()->has('comuna_id')) {
-                return;
-            }
-
-            $comunaId = $request->input('comuna_id');
-            if ($comunaId === null || $comunaId === '') {
-                return;
-            }
-
-            $regionId = $request->input('region_id', $location->region_id);
-            $comuna = Comuna::find($comunaId);
-            if (! $comuna || (int) $comuna->region_id !== (int) $regionId) {
-                $v->errors()->add('comuna_id', 'La comuna no pertenece a la región seleccionada.');
-            }
-        });
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
 
         // Detect if the request is trying to deactivate the location
         $isTryingToDeactivate = $request->has('active')
