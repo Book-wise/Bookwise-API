@@ -75,6 +75,8 @@ class ThisWeekBookingsSeeder extends Seeder
                 ['10:30', 'carlos', 'kinesio'],     // ends 11:30
                 ['14:00', 'ana',    'kinesio'],     // ends 15:00
                 ['15:15', 'ana',    'drenaje'],     // ends 16:45
+                ['16:00', 'jorge',  'relajante'],   // ends 17:00
+                ['11:00', 'sebas',  'deportivo'],   // ends 11:45
             ],
             2 => [ // Tuesday
                 ['09:00', 'jorge',   'relajante'],  // ends 10:00
@@ -83,6 +85,8 @@ class ThisWeekBookingsSeeder extends Seeder
                 ['11:00', 'pilar',   'relajante'],  // ends 12:00
                 ['14:00', 'diego',   'kinesio'],    // ends 15:00
                 ['15:30', 'claudia', 'drenaje'],    // ends 17:00
+                ['16:30', 'maria',   'relajante'],  // ends 17:30
+                ['10:00', 'carlos',  'kinesio'],    // ends 11:00
             ],
             3 => [ // Wednesday
                 ['09:00', 'carmen', 'deportivo'],   // ends 09:45
@@ -91,6 +95,8 @@ class ThisWeekBookingsSeeder extends Seeder
                 ['10:30', 'sebas',  'deportivo'],   // ends 11:15
                 ['14:00', 'diego',  'relajante'],   // ends 15:00
                 ['15:30', 'claudia', 'relajante'],   // ends 16:30
+                ['11:30', 'pilar',  'drenaje'],     // ends 13:00
+                ['16:00', 'ana',    'kinesio'],     // ends 17:00
             ],
             4 => [ // Thursday
                 ['09:00', 'maria',  'relajante'],   // ends 10:00
@@ -99,6 +105,8 @@ class ThisWeekBookingsSeeder extends Seeder
                 ['10:30', 'carlos', 'kinesio'],     // ends 11:30
                 ['14:00', 'ana',    'drenaje'],     // ends 15:30
                 ['16:00', 'ana',    'kinesio'],     // ends 17:00
+                ['11:30', 'claudia', 'drenaje'],    // ends 13:00
+                ['15:30', 'diego',  'deportivo'],   // ends 16:15
             ],
             5 => [ // Friday
                 ['09:00', 'carmen', 'kinesio'],     // ends 10:00
@@ -107,6 +115,8 @@ class ThisWeekBookingsSeeder extends Seeder
                 ['10:00', 'sebas',  'kinesio'],     // ends 11:00
                 ['14:00', 'jorge',  'relajante'],   // ends 15:00
                 ['15:30', 'diego',  'deportivo'],   // ends 16:15
+                ['11:00', 'maria',  'drenaje'],     // ends 12:30
+                ['16:30', 'carlos', 'kinesio'],     // ends 17:30
             ],
             6 => [ // Saturday
                 ['10:00', 'maria',  'relajante'],   // ends 11:00
@@ -121,29 +131,30 @@ class ThisWeekBookingsSeeder extends Seeder
                 ['11:30', 'diego',  'kinesio'],     // ends 12:30
                 ['14:00', 'carlos', 'deportivo'],   // ends 14:45
                 ['15:00', 'claudia', 'drenaje'],     // ends 16:30
+                ['16:00', 'pilar',   'relajante'],   // ends 17:00
             ],
         ];
 
         // Past days (Mon–Wed): terminal statuses mixed with confirmados/asistidos
         // Today + future (Thu–Sun): reservado/confirmado/pendiente
         $statusByDate = [
-            '2026-05-25' => [3, 2, 3, 4, 2, 3],
-            '2026-05-26' => [2, 3, 2, 4, 3, 7],
-            '2026-05-27' => [3, 2, 4, 3, 2, 3],
-            '2026-05-28' => [2, 1, 2, 5, 1, 2],
-            '2026-05-29' => [1, 2, 1, 5, 2, 1],
-            '2026-05-30' => [2, 1, 2, 1, 5, 6],
-            '2026-05-31' => [1, 2, 5, 6],
+            '2026-07-20' => [3, 2, 3, 4, 2, 3, 2, 1],
+            '2026-07-21' => [2, 3, 2, 4, 3, 7, 1, 5],
+            '2026-07-22' => [3, 2, 4, 3, 2, 3, 5, 1],
+            '2026-07-23' => [2, 1, 2, 5, 1, 2, 3, 6],
+            '2026-07-24' => [1, 2, 1, 5, 2, 1, 3, 4],
+            '2026-07-25' => [2, 1, 2, 1, 5, 6],
+            '2026-07-26' => [1, 2, 5, 6, 3],
         ];
 
         $paymentByDate = [
-            '2026-05-25' => ['paid', 'paid', 'paid', 'partial', 'paid', null],
-            '2026-05-26' => ['paid', 'paid', 'partial', 'unpaid', 'paid', null],
-            '2026-05-27' => ['paid', 'partial', 'paid', 'paid', null, 'partial'],
-            '2026-05-28' => ['partial', null, 'paid', null, null, 'partial'],
-            '2026-05-29' => [null, null, 'partial', null, 'paid', null],
-            '2026-05-30' => [null, 'partial', null, null, null, 'partial'],
-            '2026-05-31' => [null, null, 'partial', null],
+            '2026-07-20' => ['paid', 'paid', 'paid', 'partial', 'paid', null, 'paid', null],
+            '2026-07-21' => ['paid', 'paid', 'partial', 'unpaid', 'paid', null, null, 'partial'],
+            '2026-07-22' => ['paid', 'partial', 'paid', 'paid', null, 'partial', null, null],
+            '2026-07-23' => ['partial', null, 'paid', null, null, 'partial', 'paid', null],
+            '2026-07-24' => [null, null, 'partial', null, 'paid', null, 'paid', 'partial'],
+            '2026-07-25' => [null, 'partial', null, null, null, 'partial'],
+            '2026-07-26' => [null, null, 'partial', null, 'paid'],
         ];
 
         $clientIdx = 0;
