@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\CustomAttributeController;
 use App\Http\Controllers\Api\V1\LocationController;
 use App\Http\Controllers\Api\V1\PackSessionController;
 use App\Http\Controllers\Api\V1\ProviderController;
+use App\Http\Controllers\Api\V1\RegionController;
 use App\Http\Controllers\Api\V1\SaleController;
 use App\Http\Controllers\Api\V1\ServiceController;
 use App\Http\Controllers\Api\V1\ServicePackController;
@@ -38,6 +39,8 @@ Route::middleware('throttle:api_public')->prefix('v1')->group(function () {
     Route::get('/services/{id}', [ServiceController::class, 'show']);
     Route::get('/locations', [LocationController::class, 'index']);
     Route::get('/locations/{id}', [LocationController::class, 'show']);
+    Route::get('/regions', [RegionController::class, 'index']);
+    Route::get('/regions/{id}/comunas', [RegionController::class, 'showComunas']);
     Route::get('/packs', [ServicePackController::class, 'index']);
     Route::get('/packs/{id}', [ServicePackController::class, 'show']);
 });
@@ -76,6 +79,13 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
         ->middleware('scope:clients:read');
     Route::get('/clients/{id}/packs', [ClientPackController::class, 'clientPacks'])
         ->middleware('scope:clients:read');
+
+    // Locations
+    Route::post('/locations', [LocationController::class, 'store'])
+        ->middleware('scope:bookings:write');
+    Route::patch('/locations/{id}', [LocationController::class, 'update'])
+        ->middleware('scope:bookings:write')
+        ->middleware('role:admin');
 
     // Providers
     Route::get('/providers', [ProviderController::class, 'index'])
