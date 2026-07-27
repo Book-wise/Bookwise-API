@@ -19,7 +19,7 @@ enum UserRole: string
     {
         return match ($this) {
             self::ADMIN => ['*'],
-            self::PROVIDER => ['bookings:read', 'bookings:write', 'clients:read'],
+            self::PROVIDER => ['bookings:read', 'bookings:write', 'clients:read', 'providers:read'],
             self::WOOCOMMERCE => ['clients:read', 'clients:write', 'bookings:read', 'bookings:write'],
             self::CLIENT => ['clients:read'],
             self::AGENT => ['bookings:read', 'bookings:write', 'clients:read', 'clients:write', 'providers:read'],

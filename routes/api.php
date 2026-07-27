@@ -88,11 +88,17 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
         ->middleware('scope:bookings:write')
         ->middleware('role:admin');
 
-    // Providers
+    // Providers — solo admin escribe, providers pueden leer
     Route::get('/providers', [ProviderController::class, 'index'])
         ->middleware('scope:providers:read');
     Route::get('/providers/{id}', [ProviderController::class, 'show'])
         ->middleware('scope:providers:read');
+    Route::post('/providers', [ProviderController::class, 'store'])
+        ->middleware('scope:providers:write')
+        ->middleware('role:admin');
+    Route::patch('/providers/{id}', [ProviderController::class, 'update'])
+        ->middleware('scope:providers:write')
+        ->middleware('role:admin');
 
     // Sales
     Route::get('/sales', [SaleController::class, 'index'])->middleware('scope:sales:read');

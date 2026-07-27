@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ProviderStoreRequest;
+use App\Http\Requests\ProviderUpdateRequest;
 use App\Http\Resources\V1\ProviderResource;
 use App\Models\Provider;
 use Illuminate\Http\JsonResponse;
@@ -35,5 +37,32 @@ class ProviderController extends Controller
         $provider = Provider::with(['location', 'services'])->findOrFail($id);
 
         return response()->json(['data' => new ProviderResource($provider)]);
+    }
+
+    public function store(ProviderStoreRequest $request): JsonResponse
+    {
+        $provider = Provider::create($request->validated());
+
+        $provider->load(['location', 'services']);
+
+        return response()->json([
+            'data' => new ProviderResource($provider),
+            'message' => 'Profesional creado exitosamente',
+        ], 201);
+    }
+
+    public function update(ProviderUpdateRequest $request, int $id): JsonResponse
+    {
+        $provider = Provider::findOrFail($id);
+
+        $provider->update($request->validated());
+
+        $provider->refresh();
+        $provider->load(['location', 'services']);
+
+        return response()->json([
+            'data' => new ProviderResource($provider),
+            'message' => 'Profesional actualizado exitosamente',
+        ], 200);
     }
 }
