@@ -29,4 +29,17 @@ class RegionController extends Controller
 
         return response()->json(['data' => $comunas]);
     }
+
+    /**
+     * Get all comunas across all regions in a single request.
+     */
+    public function indexComunas(): JsonResponse
+    {
+        $comunas = Comuna::query()
+            ->select(['id', 'name', 'region_id'])
+            ->orderBy('name')
+            ->get();
+
+        return response()->json(['data' => $comunas]);
+    }
 }

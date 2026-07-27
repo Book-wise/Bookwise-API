@@ -40,6 +40,7 @@ Route::middleware('throttle:api_public')->prefix('v1')->group(function () {
     Route::get('/locations', [LocationController::class, 'index']);
     Route::get('/locations/{id}', [LocationController::class, 'show']);
     Route::get('/regions', [RegionController::class, 'index']);
+    Route::get('/comunas', [RegionController::class, 'indexComunas']);
     Route::get('/regions/{id}/comunas', [RegionController::class, 'showComunas']);
     Route::get('/packs', [ServicePackController::class, 'index']);
     Route::get('/packs/{id}', [ServicePackController::class, 'show']);
