@@ -17,16 +17,29 @@ class HistoricsDemoSeeder extends Seeder
 {
     public function run(): void
     {
-        // ── Idempotent cleanup — hard-delete previous demo run ────────
+        // ── Idempotent cleanup — remove only THIS seeder's previous demo run ──
+        // Never delete by client_id alone: the rotation in other seeders
+        // (DB::table('clients')->orderBy('id')->pluck('id')) can assign the demo
+        // client id to unrelated agenda slots, and sweeping those up would drop
+        // real bookings (the slots' client is a mutable attribute). Its own
+        // bookings are the only ones that carry a booking_status_history row
+        // (created below), so that is used as the discriminator instead of
+        // `notes` (other seeders overwrite notes). The demo client itself keeps
+        // a stable id so the client list the rotation reads stays deterministic.
         $existingClient = Client::withTrashed()->where('email', 'demo.historics@mail.com')->first();
         if ($existingClient) {
-            Sale::where('client_id', $existingClient->id)->delete();
-            $bookings = Booking::withTrashed()->where('client_id', $existingClient->id)->get();
+            $bookings = Booking::withTrashed()
+                ->where('client_id', $existingClient->id)
+                ->whereHas('statusHistory')
+                ->get();
+
+            Sale::whereIn('booking_id', $bookings->pluck('id'))->delete();
+
             foreach ($bookings as $b) {
                 $b->statusHistory()->delete();
                 $b->forceDelete();
             }
-            $existingClient->forceDelete();
+
             $this->command->info('  - Cleaned up previous demo data');
         }
 

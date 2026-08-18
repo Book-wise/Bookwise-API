@@ -14,12 +14,17 @@ use App\Models\Location;
 use App\Models\Service;
 use App\Models\ServicePack;
 use App\Models\User;
+use App\Services\IdempotencyService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class BookingController extends Controller
 {
+    public function __construct(
+        private readonly IdempotencyService $idempotency,
+    ) {}
+
     // ── Role → BookingSource ───────────────────────────────────────
 
     /**
@@ -102,6 +107,25 @@ class BookingController extends Controller
         $validated['service_id'] = $service->id;
         unset($validated['service_pack_id']);
 
+        $endpoint = 'POST /v1/bookings';
+        $requestHash = md5($request->getContent());
+        $hasIdempotencyKey = $request->hasHeader('Idempotency-Key');
+
+        if ($hasIdempotencyKey) {
+            $cached = $this->idempotency->check($request, $endpoint);
+            if ($cached !== null) {
+                return $cached;
+            }
+
+            $status = $this->idempotency->acquire($request, $endpoint, $requestHash);
+            if ($status === 1) {
+                return response()->json([
+                    'error' => 'conflict',
+                    'detail' => 'A request with this idempotency key is already in progress or conflicts.',
+                ], 409);
+            }
+        }
+
         // Parse start_time in the location's timezone,
         // then convert to app timezone for consistent storage.
         $location = Location::findOrFail($validated['location_id']);
@@ -128,6 +152,10 @@ class BookingController extends Controller
         );
 
         if ($conflict) {
+            if ($hasIdempotencyKey) {
+                $this->idempotency->release($request, $endpoint);
+            }
+
             $conflictType = $conflict->location_id === (int) $validated['location_id']
                 ? 'Location overlap with existing booking'
                 : 'Client overlap with existing booking';
@@ -145,16 +173,28 @@ class BookingController extends Controller
 
         $source = $this->resolveBookingSource($request->user());
 
-        $booking = Booking::create([
-            ...$validated,
-            'end_time' => $endTime,
-            'custom_duration_minutes' => $validated['duration_minutes'] ?? null,
-            'price' => $validated['price'] ?? $service->price,
-            'created_via' => $source,
-            'last_modified_via' => $source,
-        ]);
+        try {
+            $booking = Booking::create([
+                ...$validated,
+                'end_time' => $endTime,
+                'custom_duration_minutes' => $validated['duration_minutes'] ?? null,
+                'price' => $validated['price'] ?? $service->price,
+                'created_via' => $source,
+                'last_modified_via' => $source,
+            ]);
+        } catch (\Throwable $e) {
+            if ($hasIdempotencyKey) {
+                $this->idempotency->release($request, $endpoint);
+            }
+
+            throw $e;
+        }
 
         $booking->load(['client', 'service', 'provider', 'location', 'status']);
+
+        if ($hasIdempotencyKey) {
+            $this->idempotency->store($request, $endpoint, 201, ['data' => new BookingResource($booking)]);
+        }
 
         return response()->json(['data' => new BookingResource($booking)], 201);
     }
@@ -230,6 +270,25 @@ class BookingController extends Controller
     // ── PATCH /v1/bookings/{id}/cancel ────────────────────────────
     public function cancel(Request $request, int $id): JsonResponse
     {
+        $endpoint = 'PATCH /v1/bookings/'.$id.'/cancel';
+        $requestHash = md5($request->getContent());
+        $hasIdempotencyKey = $request->hasHeader('Idempotency-Key');
+
+        if ($hasIdempotencyKey) {
+            $cached = $this->idempotency->check($request, $endpoint);
+            if ($cached !== null) {
+                return $cached;
+            }
+
+            $status = $this->idempotency->acquire($request, $endpoint, $requestHash);
+            if ($status === 1) {
+                return response()->json([
+                    'error' => 'conflict',
+                    'detail' => 'A request with this idempotency key is already in progress or conflicts.',
+                ], 409);
+            }
+        }
+
         $booking = Booking::findOrFail($id);
 
         $this->authorize('cancel', $booking);
@@ -238,24 +297,40 @@ class BookingController extends Controller
 
         // Ya está cancelada
         if ($booking->status_id === $cancelStatus->id) {
+            if ($hasIdempotencyKey) {
+                $this->idempotency->release($request, $endpoint);
+            }
+
             return response()->json([
                 'error' => 'already_cancelled',
                 'detail' => 'This booking is already cancelled.',
             ], 422);
         }
 
-        $booking->update([
-            'status_id' => $cancelStatus->id,
-            'last_modified_via' => $this->resolveBookingSource($request->user()),
-        ]);
+        try {
+            $booking->update([
+                'status_id' => $cancelStatus->id,
+                'last_modified_via' => $this->resolveBookingSource($request->user()),
+            ]);
 
-        // Registrar en historial
-        $booking->statusHistory()->create([
-            'status_id' => $cancelStatus->id,
-            'notes' => $request->input('notes', 'Cancelled via API'),
-        ]);
+            // Registrar en historial
+            $booking->statusHistory()->create([
+                'status_id' => $cancelStatus->id,
+                'notes' => $request->input('notes', 'Cancelled via API'),
+            ]);
+        } catch (\Throwable $e) {
+            if ($hasIdempotencyKey) {
+                $this->idempotency->release($request, $endpoint);
+            }
+
+            throw $e;
+        }
 
         $booking->load(['client', 'service', 'provider', 'location', 'status']);
+
+        if ($hasIdempotencyKey) {
+            $this->idempotency->store($request, $endpoint, 200, ['data' => new BookingResource($booking)]);
+        }
 
         return response()->json(['data' => new BookingResource($booking)]);
     }

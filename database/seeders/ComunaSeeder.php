@@ -9,7 +9,16 @@ class ComunaSeeder extends Seeder
 {
     public function run(): void
     {
-        $now = now();
+        // Helper idempotente: clave natural (region_id, name). Reinserción no duplica.
+        $upsert = function (string $table, array $key, array $values): int {
+            if (DB::table($table)->where($key)->exists()) {
+                DB::table($table)->where($key)->update(array_merge($values, ['updated_at' => now()]));
+            } else {
+                DB::table($table)->insert(array_merge($key, $values, ['created_at' => now(), 'updated_at' => now()]));
+            }
+
+            return DB::table($table)->where($key)->value('id');
+        };
 
         $all = [];
 
@@ -249,10 +258,11 @@ class ComunaSeeder extends Seeder
         $all[] = ['region_id' => 16, 'name' => 'Timaukel'];
         $all[] = ['region_id' => 16, 'name' => 'Torres del Paine'];
 
-        // ── Bulk insert ─────────────────────────────────────────────
-        $data = array_map(fn ($r) => $r + ['created_at' => $now, 'updated_at' => $now], $all);
-        DB::table('comunas')->insert($data);
+        // ── Upsert idempotente ──────────────────────────────────────
+        foreach ($all as $comuna) {
+            $upsert('comunas', ['region_id' => $comuna['region_id'], 'name' => $comuna['name']], []);
+        }
 
-        $this->command?->info('Seeded '.count($all).' comunas across all 16 regions.');
+        $this->command?->info('Seeded '.count($all).' comunas across all 16 regions (idempotent).');
     }
 }

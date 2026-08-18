@@ -199,11 +199,11 @@ class TestDataSeeder extends Seeder
         $bookingIds = [];
         foreach ($bookings as [$start, $end, $clientId, $serviceId, $providerId, $locationId, $statusId, $price, $payment]) {
             $bookingId = $upsert('bookings', [
-                'client_id' => $clientId,
                 'provider_id' => $providerId,
                 'location_id' => $locationId,
                 'start_time' => $start,
             ], [
+                'client_id' => $clientId,
                 'service_id' => $serviceId,
                 'status_id' => $statusId,
                 'end_time' => $end,

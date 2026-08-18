@@ -9,10 +9,29 @@ class JuneBookingsSeeder extends Seeder
 {
     public function run(): void
     {
+        // Helper idempotente (mismo patrón que TestDataSeeder): bookings por
+        // (provider_id, location_id, start_time) y sales por booking_id.
+        $upsert = function (string $table, array $key, array $values): int {
+            if (DB::table($table)->where($key)->exists()) {
+                DB::table($table)->where($key)->update(array_merge($values, ['updated_at' => now()]));
+            } else {
+                DB::table($table)->insert(array_merge($key, $values, ['created_at' => now(), 'updated_at' => now()]));
+            }
+
+            return DB::table($table)->where($key)->value('id');
+        };
+
         $providers = DB::table('providers')->pluck('id', 'email');
         $services = DB::table('services')->pluck('id', 'name');
         $locations = DB::table('locations')->pluck('id', 'name');
-        $clients = DB::table('clients')->orderBy('id')->pluck('id')->values()->all();
+        // Pool estable: excluye al cliente demo (HistoricsDemoSeeder) para que la
+        // rotación % count no cambie entre corridas ni se borre nada por su cleanup.
+        $clients = DB::table('clients')
+            ->where('email', '!=', 'demo.historics@mail.com')
+            ->orderBy('id')
+            ->pluck('id')
+            ->values()
+            ->all();
 
         $p = [
             'maria' => $providers['maria@kinesilk.cl'],
@@ -151,24 +170,22 @@ class JuneBookingsSeeder extends Seeder
                 $statusIdx++;
                 $paymentIdx++;
 
-                $bookingId = DB::table('bookings')->insertGetId([
-                    'client_id' => $clientId,
-                    'service_id' => $s[$svcKey],
+                $bookingId = $upsert('bookings', [
                     'provider_id' => $p[$provKey],
                     'location_id' => $l[$providerLocation[$provKey]],
-                    'status_id' => $statusId,
                     'start_time' => $startStr,
+                ], [
+                    'client_id' => $clientId,
+                    'service_id' => $s[$svcKey],
+                    'status_id' => $statusId,
                     'end_time' => $endStr,
                     'price' => $price,
                     'created_via' => 'admin_calendar',
                     'last_modified_via' => 'admin_calendar',
-                    'created_at' => now(),
-                    'updated_at' => now(),
                 ]);
 
                 if ($payment !== null) {
-                    DB::table('sales')->insert([
-                        'booking_id' => $bookingId,
+                    $upsert('sales', ['booking_id' => $bookingId], [
                         'total' => $price,
                         'paid_amount' => match ($payment) {
                             'paid' => $price,
@@ -177,8 +194,7 @@ class JuneBookingsSeeder extends Seeder
                         },
                         'payment_method' => 'transferencia',
                         'paid_at' => $payment === 'paid' ? now()->subDays(rand(1, 5)) : null,
-                        'created_at' => now(),
-                        'updated_at' => now(),
+                        'client_id' => $clientId,
                     ]);
                 }
             }

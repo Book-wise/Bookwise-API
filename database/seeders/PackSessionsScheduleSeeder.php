@@ -6,7 +6,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Schedules future June bookings for all pending pack sessions so every sale
+ * Schedules future June bookings for pending pack sessions so every sale
  * linked to a client_pack returns complete session data in GET /sales/:id.
  *
  * Strategy: all pack sessions use the 12:00 slot — verified free across all
@@ -16,11 +16,27 @@ use Illuminate\Support\Facades\DB;
  *   svc1 Relajante (60min) → Pilar p5 loc2  — Tuesdays
  *   svc3 Kinesio   (60min) → Carlos p4 loc2 — Wednesdays
  *   svc4 Drenaje   (90min) → Claudia p9 loc3 — Saturdays
+ *
+ * Idempotent: cada sesión pendiente se mapea a una fecha según su posición
+ * GLOBAL estable (ordenando TODAS las sesiones del servicio por client_pack_id
+ * + session_number, sin importar su estado). Así una sesión pendiente obtiene
+ * la MISMÍSIMA fecha en cada corrida y el upsert no duplica filas.
  */
 class PackSessionsScheduleSeeder extends Seeder
 {
     public function run(): void
     {
+        // Helper idempotente (mismo patrón que TestDataSeeder).
+        $upsert = function (string $table, array $key, array $values): int {
+            if (DB::table($table)->where($key)->exists()) {
+                DB::table($table)->where($key)->update(array_merge($values, ['updated_at' => now()]));
+            } else {
+                DB::table($table)->insert(array_merge($key, $values, ['created_at' => now(), 'updated_at' => now()]));
+            }
+
+            return DB::table($table)->where($key)->value('id');
+        };
+
         $providers = DB::table('providers')->pluck('id', 'email');
         $locations = DB::table('locations')->pluck('id', 'name');
         $services = DB::table('services')->pluck('id', 'name');
@@ -53,77 +69,79 @@ class PackSessionsScheduleSeeder extends Seeder
             $sDrenaje => [$pClaudia, $lProvidencia, 90, 45000, $saturdays],
         ];
 
-        // Track date index per service so sessions from different packs
-        // don't pile up on the same date
-        $dateIdx = [$sRelajante => 0, $sKinesio => 0, $sDrenaje => 0];
-
-        // Load all pending sessions grouped by pack, ordered by session_number.
-        // For each pack we only schedule the first half — the rest stay pending
-        // to reflect the real scenario where a client hasn't booked all sessions yet.
-        $pending = DB::table('pack_sessions')
+        // Todas las sesiones del servicio — el ORDEN GLOBAL es estable entre
+        // corridas (las filas se crean de forma idempotente), así la posición
+        // de cada sesión pendiente no cambia y la fecha asignada tampoco.
+        $sessions = DB::table('pack_sessions')
             ->join('client_packs', 'pack_sessions.client_pack_id', '=', 'client_packs.id')
             ->join('service_packs', 'client_packs.service_pack_id', '=', 'service_packs.id')
-            ->where('pack_sessions.status', 'pending')
             ->select(
                 'pack_sessions.id as session_id',
                 'pack_sessions.session_number',
                 'pack_sessions.client_pack_id',
+                'pack_sessions.status as session_status',
                 'client_packs.client_id',
                 'service_packs.service_id'
             )
             ->orderBy('pack_sessions.client_pack_id')
             ->orderBy('pack_sessions.session_number')
-            ->get()
-            ->groupBy('client_pack_id');
+            ->get();
 
-        // Per pack: schedule only ceil(count / 2) sessions, leave the rest pending
-        $toSchedule = collect();
-        foreach ($pending as $packSessions) {
-            $scheduleCount = (int) ceil($packSessions->count() / 2);
-            $toSchedule = $toSchedule->concat($packSessions->take($scheduleCount));
-        }
+        // Sesiones por servicio manteniendo el orden estable.
+        $byService = $sessions->groupBy('service_id');
 
-        foreach ($toSchedule as $session) {
-            $svcId = $session->service_id;
-
+        foreach ($byService as $svcId => $serviceSessions) {
             if (! isset($config[$svcId])) {
                 continue;
             }
 
             [$providerId, $locationId, $duration, $price, $dates] = $config[$svcId];
 
-            $idx = $dateIdx[$svcId];
+            foreach ($serviceSessions as $position => $session) {
+                // Solo se agendan pendientes; queremos mantener su posición.
+                if ($session->session_status !== 'pending') {
+                    continue;
+                }
 
-            if ($idx >= count($dates)) {
-                continue;
-            }
+                // Índice de fecha derivado de la posición global estable.
+                if ($position >= count($dates)) {
+                    continue;
+                }
 
-            $date = $dates[$idx];
-            $startTime = "{$date} 12:00:00";
-            $endTime = date('Y-m-d H:i:s', strtotime($startTime) + $duration * 60);
+                $date = $dates[$position];
+                $startTime = "{$date} 12:00:00";
+                $endTime = date('Y-m-d H:i:s', strtotime($startTime) + $duration * 60);
 
-            $bookingId = DB::table('bookings')->insertGetId([
-                'client_id' => $session->client_id,
-                'service_id' => $svcId,
-                'provider_id' => $providerId,
-                'location_id' => $locationId,
-                'status_id' => $statusReservado,
-                'start_time' => $startTime,
-                'end_time' => $endTime,
-                'price' => $price,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+                // Guarda: no pisar un slot ya ocupado del mismo provider.
+                $slotTaken = DB::table('bookings')
+                    ->where('provider_id', $providerId)
+                    ->where('start_time', $startTime)
+                    ->exists();
 
-            DB::table('pack_sessions')
-                ->where('id', $session->session_id)
-                ->update([
-                    'booking_id' => $bookingId,
-                    'status' => 'scheduled',
-                    'updated_at' => now(),
+                if ($slotTaken) {
+                    continue;
+                }
+
+                $bookingId = $upsert('bookings', [
+                    'provider_id' => $providerId,
+                    'location_id' => $locationId,
+                    'start_time' => $startTime,
+                ], [
+                    'client_id' => $session->client_id,
+                    'service_id' => $svcId,
+                    'status_id' => $statusReservado,
+                    'end_time' => $endTime,
+                    'price' => $price,
                 ]);
 
-            $dateIdx[$svcId]++;
+                DB::table('pack_sessions')
+                    ->where('id', $session->session_id)
+                    ->update([
+                        'booking_id' => $bookingId,
+                        'status' => 'scheduled',
+                        'updated_at' => now(),
+                    ]);
+            }
         }
     }
 }

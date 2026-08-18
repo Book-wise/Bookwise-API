@@ -24,9 +24,12 @@ class SalesTransactionsSeeder extends Seeder
         // ── 2. Crear transacciones para ventas ya existentes ──────
         // TestDataSeeder insertó sales directamente con paid_amount.
         // Creamos transacciones que reflejen ese estado para el tab de pagos.
+        // Idempotente: solo crea transacciones para ventas sin ninguna aún.
+        // Order determinístico para que la iteración sea estable entre corridas.
         $existingSales = DB::table('sales')
             ->where('paid_amount', '>', 0)
             ->whereNotExists(fn ($q) => $q->from('sale_transactions')->whereColumn('sale_transactions.sale_id', 'sales.id'))
+            ->orderBy('sales.id')
             ->get();
 
         foreach ($existingSales as $sale) {
@@ -50,6 +53,7 @@ class SalesTransactionsSeeder extends Seeder
 
         // ── 3. Ventas para los client_packs existentes ────────────
         // total = service.price × total_sessions — nunca service_pack.price
+        // Idempotente: solo para client_packs sin venta ligada (client_pack_id).
         $clientPacks = DB::table('client_packs')
             ->join('service_packs', 'client_packs.service_pack_id', '=', 'service_packs.id')
             ->join('services', 'service_packs.service_id', '=', 'services.id')
@@ -59,6 +63,7 @@ class SalesTransactionsSeeder extends Seeder
                 'services.price as session_price'
             )
             ->whereNotExists(fn ($q) => $q->from('sales')->whereColumn('sales.client_pack_id', 'client_packs.id'))
+            ->orderBy('client_packs.id')
             ->get();
 
         $packStates = ['paid', 'partial', 'unpaid'];
@@ -95,6 +100,7 @@ class SalesTransactionsSeeder extends Seeder
 
         // ── 4. Ventas para reservas pasadas sin sale (semana actual) ──
         // Excluye bookings que son sesiones de pack — su pack ya tiene su propia sale
+        // Idempotente: solo para bookings pasados sin venta (y que no sean sesión de pack).
         $pastBookings = DB::table('bookings')
             ->leftJoin('sales', 'bookings.id', '=', 'sales.booking_id')
             ->whereNull('sales.id')
@@ -102,6 +108,7 @@ class SalesTransactionsSeeder extends Seeder
             ->whereDate('bookings.start_time', '<', now()->toDateString())
             ->whereNotExists(fn ($q) => $q->from('pack_sessions')->whereColumn('pack_sessions.booking_id', 'bookings.id'))
             ->select('bookings.id', 'bookings.client_id', 'bookings.price', 'bookings.service_id')
+            ->orderBy('bookings.id')
             ->get();
 
         $pastStates = ['paid', 'paid', 'partial', 'unpaid', 'paid', 'partial'];
@@ -148,6 +155,7 @@ class SalesTransactionsSeeder extends Seeder
             ->whereNotExists(fn ($q) => $q->from('pack_sessions')->whereColumn('pack_sessions.booking_id', 'bookings.id'))
             ->select('bookings.id', 'bookings.client_id', 'bookings.price')
             ->orderBy('bookings.start_time')
+            ->orderBy('bookings.id')
             ->get();
 
         // Solo la mitad recibe anticipo — excluye sesiones de pack
