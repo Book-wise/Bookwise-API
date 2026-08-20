@@ -51,7 +51,8 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
 
     // Bookings - providers see only their location's bookings, admins see all
     Route::get('/bookings', [BookingController::class, 'index'])
-        ->middleware('scope:bookings:read');
+        ->middleware('scope:bookings:read')
+        ->middleware('ownership');
     Route::get('/bookings/{id}', [BookingController::class, 'show'])
         ->middleware('scope:bookings:read')
         ->middleware('ownership:'.Booking::class);

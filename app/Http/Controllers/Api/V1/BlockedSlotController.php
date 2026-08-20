@@ -40,6 +40,13 @@ class BlockedSlotController extends Controller
                     'detail' => 'A request with this idempotency key is already in progress or conflicts.',
                 ], 409);
             }
+
+            if ($status === 2) {
+                return $this->idempotency->check($request, $endpoint) ?? response()->json([
+                    'error' => 'conflict',
+                    'detail' => 'A request with this idempotency key is already in progress or conflicts.',
+                ], 409);
+            }
         }
 
         $data = $request->validate([

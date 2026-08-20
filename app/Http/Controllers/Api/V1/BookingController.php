@@ -124,6 +124,13 @@ class BookingController extends Controller
                     'detail' => 'A request with this idempotency key is already in progress or conflicts.',
                 ], 409);
             }
+
+            if ($status === 2) {
+                return $this->idempotency->check($request, $endpoint) ?? response()->json([
+                    'error' => 'conflict',
+                    'detail' => 'A request with this idempotency key is already in progress or conflicts.',
+                ], 409);
+            }
         }
 
         // Parse start_time in the location's timezone,
@@ -283,6 +290,13 @@ class BookingController extends Controller
             $status = $this->idempotency->acquire($request, $endpoint, $requestHash);
             if ($status === 1) {
                 return response()->json([
+                    'error' => 'conflict',
+                    'detail' => 'A request with this idempotency key is already in progress or conflicts.',
+                ], 409);
+            }
+
+            if ($status === 2) {
+                return $this->idempotency->check($request, $endpoint) ?? response()->json([
                     'error' => 'conflict',
                     'detail' => 'A request with this idempotency key is already in progress or conflicts.',
                 ], 409);
