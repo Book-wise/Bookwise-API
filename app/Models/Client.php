@@ -12,11 +12,12 @@ class Client extends Model
     protected $fillable = [
         'first_name', 'last_name', 'email',
         'phone', 'rut', 'gender', 'wc_customer_id',
-        'address', 'notes', 'active'
+        'address', 'notes', 'active', 'notifications_enabled',
     ];
 
     protected $casts = [
         'active' => 'boolean',
+        'notifications_enabled' => 'boolean',
     ];
 
     public function bookings()

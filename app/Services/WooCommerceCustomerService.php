@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Client;
-use Illuminate\Support\Str;
 
 class WooCommerceCustomerService
 {
@@ -31,40 +30,30 @@ class WooCommerceCustomerService
         $address = collect($addressParts)->filter()->join(', ');
 
         $rut = null;
-        if (!empty($metaData)) {
+        if (! empty($metaData)) {
             $rutMeta = collect($metaData)->firstWhere('key', '_billing_rut');
             $rut = $rutMeta['value'] ?? null;
         }
 
-        $client = Client::where('wc_customer_id', $customerId)
-            ->orWhere('email', $data['email'])
-            ->first();
-
-        $isNew = !$client;
-
         $updateData = [
             'first_name' => $firstName,
-            'last_name'  => $lastName,
-            'email'     => $data['email'],
-            'phone'     => $data['billing']['phone'] ?? $data['shipping']['phone'] ?? ($billing['phone'] ?? null),
-            'address'   => $address ?: null,
-            'active'    => true,
+            'last_name' => $lastName,
+            'email' => $data['email'],
+            'phone' => $data['billing']['phone'] ?? $data['shipping']['phone'] ?? ($billing['phone'] ?? null),
+            'address' => $address ?: null,
+            'active' => true,
         ];
 
         if ($rut) {
             $updateData['rut'] = $rut;
         }
 
-        $client = Client::updateOrCreate(
-            [
-                'wc_customer_id' => $customerId,
-            ],
-            $updateData
+        Client::upsert(
+            [array_merge($updateData, ['wc_customer_id' => $customerId])],
+            ['wc_customer_id'],
+            array_keys($updateData)
         );
 
-        if ($isNew && Str::contains($event, 'created')) {
-        }
-
-        return $client;
+        return Client::where('wc_customer_id', $customerId)->first();
     }
 }

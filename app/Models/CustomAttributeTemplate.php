@@ -7,11 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 class CustomAttributeTemplate extends Model
 {
     protected $fillable = [
-        'name', 'field_type', 'options', 'required'
+        'name', 'field_type', 'options', 'required',
     ];
 
     protected $casts = [
-        'options'  => 'array',
+        'options' => 'array',
         'required' => 'boolean',
     ];
 

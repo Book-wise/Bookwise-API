@@ -12,7 +12,7 @@ class CheckTokenScope
     {
         $token = $request->user()?->currentAccessToken();
 
-        if (!$token) {
+        if (! $token) {
             return response()->json(['error' => 'forbidden'], 403);
         }
 
@@ -20,9 +20,9 @@ class CheckTokenScope
 
         $hasScope = in_array('*', $abilities) || in_array($scope, $abilities);
 
-        if (!$hasScope) {
+        if (! $hasScope) {
             return response()->json([
-                'error'  => 'forbidden',
+                'error' => 'forbidden',
                 'detail' => "Token missing required scope: {$scope}",
             ], 403);
         }

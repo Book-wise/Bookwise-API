@@ -3,156 +3,88 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\Booking;
-use App\Models\BookingStatus;
-use App\Models\Sale;
+use App\Jobs\ProcessWooCommerceWebhook;
 use App\Models\WoocommerceWebhooksLog;
-use App\Services\WooCommerceCustomerService;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class WebhookController extends Controller
 {
-    public function __construct(
-        private WooCommerceCustomerService $customerService
-    ) {}
-
     public function handle(Request $request): JsonResponse
     {
-        $secret    = config('services.woocommerce.webhook_secret');
-        $payload   = $request->getContent();
-        $signature = $request->header('X-WC-Webhook-Signature');
-        $expected  = base64_encode(hash_hmac('sha256', $payload, $secret, true));
+        $payload = $request->getContent();
 
-        if (!hash_equals($expected, $signature ?? '')) {
+        // WooCommerce delivery-test ping — no signature, just a connectivity check
+        if (str_starts_with($payload, 'webhook_id=')) {
+            return response()->json(['received' => true], 200);
+        }
+
+        $secret = trim(config('services.woocommerce.webhook_secret'));
+        $signature = $request->header('X-WC-Webhook-Signature');
+        $expected = base64_encode(hash_hmac('sha256', $payload, $secret, true));
+
+        if (! hash_equals($expected, $signature ?? '')) {
+            Log::info('WooCommerce webhook signature mismatch', [
+                'header_signature' => $signature,
+                'computed_signature' => $expected,
+                'raw_body_prefix' => mb_substr($payload, 0, 200),
+            ]);
+
             return response()->json(['error' => 'unauthorized', 'detail' => 'Invalid webhook signature.'], 401);
         }
 
-        $data    = json_decode($payload, true);
-        $event   = $request->header('X-WC-Webhook-Topic', 'unknown');
+        $data = json_decode($payload, true);
+        $event = $request->header('X-WC-Webhook-Topic', 'unknown');
 
-        // Check for customer events first
-        if (str_contains($event, 'customer.created') || str_contains($event, 'customer.updated')) {
-            return $this->handleCustomerEvent($data, $event);
-        }
+        // Extraer datos del cliente y la reserva desde el payload
+        $billing = $data['billing'] ?? [];
+        $lineItemMeta = $data['line_items'][0]['meta_data'] ?? [];
+        $meta = collect($lineItemMeta)->pluck('value', 'key');
 
-        // Order events (existing logic)
-        $orderId = $data['id'] ?? null;
-
-        $log = WoocommerceWebhooksLog::create([
-            'event'        => $event,
-            'wc_order_id'  => $orderId,
-            'wc_entity_id' => $orderId,
-            'entity_type'  => 'order',
-            'payload'      => $payload,
-            'status'       => 'received',
+        Log::info('WooCommerce webhook received', [
+            'event' => $event,
+            'order_id' => $data['id'] ?? null,
+            'status' => $data['status'] ?? null,
+            'total' => $data['total'] ?? null,
+            'payment_method' => $data['payment_method'] ?? null,
+            'date_paid' => $data['date_paid'] ?? null,
+            'cliente' => [
+                'nombre' => trim(($billing['first_name'] ?? '').' '.($billing['last_name'] ?? '')),
+                'email' => $billing['email'] ?? null,
+                'telefono' => $billing['phone'] ?? null,
+            ],
+            'reserva' => [
+                'slot_start' => $meta->get('_kinesilk_slot_start'),
+                'slot_end' => $meta->get('_kinesilk_slot_end'),
+                'location_id' => $meta->get('_kinesilk_location_id'),
+                'service_id' => $meta->get('_kinesilk_service_id'),
+                'duracion_minutos' => $meta->get('_kinesilk_duration_minutes'),
+            ],
         ]);
 
-        try {
-            if (str_contains($event, 'order.completed')) {
-                $this->handleOrderCompleted($data, $log);
-            } elseif (str_contains($event, 'order.refunded')) {
-                $this->handleOrderRefunded($data, $log);
-            } else {
-                $log->update(['status' => 'processed']);
-            }
-        } catch (\Throwable $e) {
-            $log->update(['status' => 'failed', 'error_message' => $e->getMessage()]);
-            return response()->json(['error' => 'processing_failed'], 500);
+        // Determine entity type and IDs for logging
+        if (str_contains($event, 'customer.')) {
+            $entityType = 'customer';
+            $entityId = $data['id'] ?? null;
+            $orderId = null;
+        } else {
+            $entityType = 'order';
+            $entityId = $data['id'] ?? null;
+            $orderId = $data['id'] ?? null;
         }
 
-        return response()->json(['received' => true], 200);
-    }
-
-    private function handleCustomerEvent(array $data, string $event): JsonResponse
-    {
-        $customerId = $data['id'] ?? null;
-
-        // Log the customer event
         $log = WoocommerceWebhooksLog::create([
-            'event'         => $event,
-            'wc_entity_id'  => $customerId,
-            'entity_type'   => 'customer',
-            'payload'       => json_encode($data),
-            'status'        => 'received',
+            'event' => $event,
+            'wc_order_id' => $orderId,
+            'wc_entity_id' => $entityId,
+            'entity_type' => $entityType,
+            'payload' => $payload,
+            'status' => 'received',
         ]);
 
-        try {
-            $this->customerService->syncCustomer($data, $event);
-            $log->update(['status' => 'processed']);
-        } catch (\Throwable $e) {
-            $log->update(['status' => 'failed', 'error_message' => $e->getMessage()]);
-            return response()->json(['error' => 'processing_failed'], 500);
-        }
+        ProcessWooCommerceWebhook::dispatch($event, $payload, $log->id);
 
         return response()->json(['received' => true], 200);
-    }
-
-    private function handleOrderCompleted(array $data, $log): void
-    {
-        $orderId  = $data['id'] ?? null;
-        $meta     = collect($data['meta_data'] ?? []);
-
-        $bookingId       = $meta->firstWhere('key', '_kinesilk_booking_id')['value']      ?? null;
-        $durationMinutes = $meta->firstWhere('key', '_kinesilk_duration_minutes')['value'] ?? null;
-
-        $booking = $bookingId
-            ? Booking::find($bookingId)
-            : Booking::where('wc_order_id', $orderId)->first();
-
-        if (!$booking) {
-            $log->update(['status' => 'processed']);
-            return;
-        }
-
-        if ($durationMinutes) {
-            $booking->update([
-                'custom_duration_minutes' => (int) $durationMinutes,
-                'end_time'                => $booking->start_time->copy()->addMinutes((int) $durationMinutes),
-            ]);
-        }
-
-        $confirmed = BookingStatus::where('is_cancellation', false)->first();
-        if ($confirmed) {
-            $booking->update(['status_id' => $confirmed->id, 'wc_order_id' => $orderId]);
-            $booking->statusHistory()->create([
-                'status_id' => $confirmed->id,
-                'notes'     => 'Confirmed via WooCommerce order #' . $orderId,
-            ]);
-        }
-
-        Sale::firstOrCreate(
-            ['wc_order_id' => $orderId],
-            [
-                'booking_id'     => $booking->id,
-                'total'          => $data['total'] ?? $booking->price,
-                'payment_method' => $data['payment_method'] ?? null,
-                'paid_at'        => now(),
-            ]
-        );
-
-        $log->update(['status' => 'processed']);
-    }
-
-    private function handleOrderRefunded(array $data, $log): void
-    {
-        $orderId = $data['id'] ?? null;
-        $booking = Booking::where('wc_order_id', $orderId)->first();
-
-        if (!$booking) {
-            $log->update(['status' => 'processed']);
-            return;
-        }
-
-        $cancelStatus = BookingStatus::where('is_cancellation', true)->first();
-        if ($cancelStatus) {
-            $booking->update(['status_id' => $cancelStatus->id]);
-            $booking->statusHistory()->create([
-                'status_id' => $cancelStatus->id,
-                'notes'     => 'Cancelled via WooCommerce refund order #' . $orderId,
-            ]);
-        }
-
-        $log->update(['status' => 'processed']);
     }
 }

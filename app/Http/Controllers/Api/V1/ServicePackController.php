@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\ServicePack;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class ServicePackController extends Controller
@@ -22,6 +21,7 @@ class ServicePackController extends Controller
     public function show(int $id): JsonResponse
     {
         $pack = ServicePack::with('service')->findOrFail($id);
+
         return response()->json(['data' => $pack]);
     }
 }
