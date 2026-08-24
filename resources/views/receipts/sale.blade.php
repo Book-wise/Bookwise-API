@@ -109,7 +109,7 @@
         </div>
         @endif
         <div class="total-row">
-            Estado: {{ ucfirst($sale->payment_status) }}
+            Estado: {{ ucfirst($sale->payment_status_label) }}
         </div>
     </div>
 

@@ -50,8 +50,8 @@ class PaymentConfirmation extends Mailable
                 'total' => number_format($this->sale->total, 0, ',', '.'),
                 'remainingAmount' => number_format($this->sale->remaining_amount, 0, ',', '.'),
                 'paymentStatus' => match ($this->sale->payment_status) {
-                    'Pagado' => 'totalmente pagado',
-                    'Parcial' => 'pago parcial',
+                    'paid' => 'totalmente pagado',
+                    'partial' => 'pago parcial',
                     default => 'pendiente',
                 },
             ],

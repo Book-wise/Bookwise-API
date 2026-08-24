@@ -32,7 +32,7 @@ class BookingResource extends JsonResource
                 'color' => $this->status?->color,
                 'is_cancellation' => $this->status?->is_cancellation,
             ],
-            'payment_status' => $this->whenLoaded('sale', fn () => $this->sale->payment_status, 'Pendiente'),
+            'payment_status' => $this->whenLoaded('sale', fn () => $this->sale->payment_status, 'unpaid'),
             'payment' => new PaymentResource($this->whenLoaded('sale')),
             'pack_session' => $this->whenLoaded('packSession', function () {
                 $ps = $this->packSession;

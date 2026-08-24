@@ -58,12 +58,24 @@ class Sale extends Model
         $total = (float) $this->total;
 
         if ($paid <= 0) {
-            return 'Pendiente';
+            return 'unpaid';
         }
         if ($paid >= $total) {
-            return 'Pagado';
+            return 'paid';
         }
 
-        return 'Parcial';
+        return 'partial';
+    }
+
+    /**
+     * Spanish label for payment status — used only in PDF/presentation.
+     */
+    public function getPaymentStatusLabelAttribute(): string
+    {
+        return match ($this->payment_status) {
+            'paid' => 'Pagado',
+            'partial' => 'Parcial',
+            default => 'Pendiente',
+        };
     }
 }
