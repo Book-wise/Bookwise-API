@@ -29,13 +29,13 @@ Chain strategy: pending
 
 ## Phase 1: PaymentMethod Enum + Normalization
 
-- [ ] 1.1 RED: `tests/Unit/PaymentMethodTest.php` — canonical cases (`efectivo`, `transferencia`, `débito`, `crédito`, `otro`, `online`); `fromLegacy`: null→null, `tarjeta`→`crédito`, `credit_card`→`online`, unknown→`otro`, canonical preserved
-- [ ] 1.2 Create `app/Enums/PaymentMethod.php` string-backed enum + static `fromLegacy(?string): ?PaymentMethod`
-- [ ] 1.3 Create migration `normalize_legacy_payment_methods` (DB::table on `sales` + `sale_transactions`)
-- [ ] 1.4 Cast `payment_method` → `PaymentMethod` (nullable) in `Sale` and `SaleTransaction`
-- [ ] 1.5 `SaleController` store/update/registerTransaction validation → `Rule::enum(PaymentMethod::class)`; `SaleService::createFromBooking` → `fromLegacy()`
-- [ ] 1.6 RED: `tests/Feature/Api/V1/PaymentMethodTest.php` — invalid `payment_method` on write returns 422
-- [ ] 1.7 Run `vendor/bin/pint --dirty`
+- [x] 1.1 RED: `tests/Unit/PaymentMethodTest.php` — canonical cases (`efectivo`, `transferencia`, `débito`, `crédito`, `otro`, `online`); `fromLegacy`: null→null, `tarjeta`→`crédito`, `credit_card`→`online`, unknown→`otro`, canonical preserved
+- [x] 1.2 Create `app/Enums/PaymentMethod.php` string-backed enum + static `fromLegacy(?string): ?PaymentMethod`
+- [x] 1.3 Create migration `normalize_legacy_payment_methods` (DB::table on `sales` + `sale_transactions`)
+- [x] 1.4 Cast `payment_method` → `PaymentMethod` (nullable) in `Sale` and `SaleTransaction`
+- [x] 1.5 `SaleController` store/update/registerTransaction validation → `Rule::enum(PaymentMethod::class)`; `SaleService::createFromBooking` → `fromLegacy()`
+- [x] 1.6 RED: `tests/Feature/Api/V1/PaymentMethodTest.php` — invalid `payment_method` on write returns 422
+- [x] 1.7 Run `vendor/bin/pint --dirty`
 
 ## Phase 2: Tenant Model + Settings + Logo
 

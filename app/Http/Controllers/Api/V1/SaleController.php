@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\PaymentMethod;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\V1\SaleResource;
 use App\Http\Resources\V1\SaleTransactionResource;
@@ -15,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\Rule;
 
 class SaleController extends Controller
 {
@@ -77,7 +79,7 @@ class SaleController extends Controller
             'booking_id' => ['nullable', 'integer', 'exists:bookings,id'],
             'client_pack_id' => ['nullable', 'integer', 'exists:client_packs,id'],
             'total' => ['nullable', 'numeric', 'min:0'],
-            'payment_method' => ['nullable', 'string', 'max:100'],
+            'payment_method' => ['nullable', Rule::enum(PaymentMethod::class)],
         ]);
 
         $hasBooking = filled($validated['booking_id'] ?? null);
@@ -197,7 +199,7 @@ class SaleController extends Controller
 
         $validated = $request->validate([
             'total' => ['sometimes', 'numeric', 'min:0'],
-            'payment_method' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'payment_method' => ['sometimes', 'nullable', Rule::enum(PaymentMethod::class)],
         ]);
 
         $sale->update($validated);
@@ -253,7 +255,7 @@ class SaleController extends Controller
 
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:0.01'],
-            'payment_method' => ['nullable', 'string', 'max:100'],
+            'payment_method' => ['nullable', Rule::enum(PaymentMethod::class)],
             'notes' => ['nullable', 'string', 'max:500'],
             'paid_at' => ['nullable', 'date'],
         ]);

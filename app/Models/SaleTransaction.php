@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PaymentMethod;
 use Illuminate\Database\Eloquent\Model;
 
 class SaleTransaction extends Model
@@ -13,6 +14,7 @@ class SaleTransaction extends Model
     protected $casts = [
         'amount' => 'decimal:2',
         'paid_at' => 'datetime',
+        'payment_method' => PaymentMethod::class,
     ];
 
     public function sale()

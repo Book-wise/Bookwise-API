@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\PaymentMethod;
 use Illuminate\Database\Eloquent\Model;
 
 class Sale extends Model
@@ -15,6 +16,7 @@ class Sale extends Model
         'total' => 'decimal:2',
         'paid_amount' => 'decimal:2',
         'paid_at' => 'datetime',
+        'payment_method' => PaymentMethod::class,
     ];
 
     public function booking()

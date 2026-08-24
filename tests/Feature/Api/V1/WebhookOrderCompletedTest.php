@@ -238,14 +238,14 @@ class WebhookOrderCompletedTest extends TestCase
         $this->assertNotNull($booking->start_time);
         $this->assertNotNull($booking->end_time);
 
-        // Verify sale was created
+        // Verify sale was created (legacy `credit_card` normalized to `online`)
         $this->assertDatabaseHas('sales', [
             'wc_order_id' => 12345,
             'booking_id' => $booking->id,
             'client_id' => $client->id,
             'total' => 50000,
             'paid_amount' => 50000,
-            'payment_method' => 'credit_card',
+            'payment_method' => 'online',
         ]);
 
         // Verify sale transaction was created
@@ -253,7 +253,7 @@ class WebhookOrderCompletedTest extends TestCase
         $this->assertDatabaseHas('sale_transactions', [
             'sale_id' => $sale->id,
             'amount' => 50000,
-            'payment_method' => 'credit_card',
+            'payment_method' => 'online',
         ]);
 
         // Verify webhook log was updated
