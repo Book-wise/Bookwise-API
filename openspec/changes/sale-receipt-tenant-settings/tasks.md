@@ -39,14 +39,14 @@ Chain strategy: pending
 
 ## Phase 2: Tenant Model + Settings + Logo
 
-- [ ] 2.1 RED: `tests/Feature/Api/V1/TenantSettingsTest.php` — GET null defaults 200; PATCH partial/valid-RUT/422 invalid-RUT/422 over-length; logo 200/invalid-mime 422/oversize 422/replace; 403 non-admin; 401
-- [ ] 2.2 Migrations: `create_tenants_table`, `add_tenant_id_to_users_table` (nullable FK `nullOnDelete`)
-- [ ] 2.3 Create `Tenant` model + `TenantFactory`; add `tenant_id` fillable + `tenant()` on `User`
-- [ ] 2.4 Create `TenantSettingsRequest` (string≤255 nullable; RUT via `ChileanRutRule`) and `LogoUploadRequest` (`image`, `mimes:jpeg,png,webp`, `max:2048`)
-- [ ] 2.5 Create `TenantController` (show/update/uploadLogo) resolving `auth()->user()->tenant`
-- [ ] 2.6 Create `LogoService` — GD thumbnail ≤200px longest side, aspect preserved, webp/jpeg, `public` disk, replace prior file; GD absent → 501
-- [ ] 2.7 Add routes `GET/PATCH /tenant/settings` + `POST /tenant/settings/logo` under `role:admin`
-- [ ] 2.8 Run `vendor/bin/pint --dirty`
+- [x] 2.1 RED: `tests/Feature/Api/V1/TenantSettingsTest.php` — GET null defaults 200; PATCH partial/valid-RUT/422 invalid-RUT/422 over-length; logo 200/invalid-mime 422/oversize 422/replace; 403 non-admin; 401
+- [x] 2.2 Migrations: `create_tenants_table`, `add_tenant_id_to_users_table` (nullable FK `nullOnDelete`)
+- [x] 2.3 Create `Tenant` model + `TenantFactory`; add `tenant_id` fillable + `tenant()` on `User`
+- [x] 2.4 Create `TenantSettingsRequest` (string≤255 nullable; RUT via `ChileanRutRule`) and `LogoUploadRequest` (`image`, `mimes:jpeg,png,webp`, `max:2048`)
+- [x] 2.5 Create `TenantController` (show/update/uploadLogo) resolving `auth()->user()->tenant`
+- [x] 2.6 Create `LogoService` — GD thumbnail ≤200px longest side, aspect preserved, webp/jpeg, `public` disk, replace prior file; GD absent → 501
+- [x] 2.7 Add routes `GET/PATCH /tenant/settings` + `POST /tenant/settings/logo` under `role:admin`
+- [x] 2.8 Run `vendor/bin/pint --dirty`
 
 ## Phase 3: Sale SoftDeletes + Delete Endpoint
 

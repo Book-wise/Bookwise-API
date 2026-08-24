@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\RegionController;
 use App\Http\Controllers\Api\V1\SaleController;
 use App\Http\Controllers\Api\V1\ServiceController;
 use App\Http\Controllers\Api\V1\ServicePackController;
+use App\Http\Controllers\Api\V1\TenantController;
 use App\Http\Controllers\Api\V1\WebhookController;
 use App\Models\BlockedSlot;
 use App\Models\Booking;
@@ -147,6 +148,11 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
     Route::delete('/blocked-slots/group/{repeatGroupId}', [BlockedSlotController::class, 'destroyGroup'])
         ->middleware('scope:bookings:write')
         ->middleware('ownership:'.BlockedSlot::class.',repeatGroupId');
+
+    // Tenant settings — admin only, resolved from the authenticated user's tenant
+    Route::get('/tenant/settings', [TenantController::class, 'show'])->middleware('role:admin');
+    Route::patch('/tenant/settings', [TenantController::class, 'update'])->middleware('role:admin');
+    Route::post('/tenant/settings/logo', [TenantController::class, 'uploadLogo'])->middleware('role:admin');
 
     // Me
     Route::get('/me', [ClientController::class, 'me'])->middleware('scope:clients:read');
