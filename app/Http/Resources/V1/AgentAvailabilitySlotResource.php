@@ -5,6 +5,12 @@ namespace App\Http\Resources\V1;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/**
+ * @property object $provider
+ * @property object $location
+ * @property string $start_time
+ * @property string $end_time
+ */
 class AgentAvailabilitySlotResource extends JsonResource
 {
     public function toArray(Request $request): array
