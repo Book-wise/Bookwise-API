@@ -48,7 +48,8 @@ class SaleReceiptController extends Controller
 
         $pdf = $this->receiptService->generate($sale, $tenant);
 
-        Mail::to($validated['email'])->queue(new ReceiptMail($sale, $pdf));
+        // Base64-encode for queue serialization (raw binary breaks JSON encoding)
+        Mail::to($validated['email'])->queue(new ReceiptMail($sale, base64_encode($pdf)));
 
         return response()->json(['message' => 'Comprobante enviado']);
     }

@@ -59,7 +59,7 @@ class ReceiptMail extends Mailable
     public function attachments(): array
     {
         return [
-            Attachment::fromData(fn () => $this->pdf, "receipt-{$this->sale->id}.pdf", mime: 'application/pdf'),
+            Attachment::fromData(fn () => base64_decode($this->pdf), "receipt-{$this->sale->id}.pdf")->withMime('application/pdf'),
         ];
     }
 }
