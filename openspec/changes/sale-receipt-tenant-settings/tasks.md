@@ -58,13 +58,13 @@ Chain strategy: pending
 
 ## Phase 4: Receipt PDF + Send Email
 
-- [ ] 4.1 Add `barryvdh/laravel-dompdf` to `composer.json`
-- [ ] 4.2 RED: `tests/Feature/Api/V1/SaleReceiptTest.php` — 200 `application/pdf` + attachment; Bearer header auth; incomplete profile 200; 404 trashed; 401; send 202+mail, 422 no email, 404
-- [ ] 4.3 Create `resources/views/receipts/sale.blade.php` — nullable-safe header, absolute-path/base64 logo
-- [ ] 4.4 Create `ReceiptService::generate(Sale, ?Tenant): string` (dompdf)
-- [ ] 4.5 Create `ReceiptMail` (attach PDF via `Attachment::fromData`)
-- [ ] 4.6 Create `SaleReceiptController` (show/send); routes `GET /sales/{id}/receipt` (`scope:sales:read`) + `POST .../send` (`scope:sales:read` + `role:admin`)
-- [ ] 4.7 Run `vendor/bin/pint --dirty`
+- [x] 4.1 Add `barryvdh/laravel-dompdf` to `composer.json`
+- [x] 4.2 RED: `tests/Feature/Api/V1/SaleReceiptTest.php` — 200 `application/pdf` + attachment; Bearer header auth; incomplete profile 200; 404 trashed; 401; send 202+mail, 422 no email, 404
+- [x] 4.3 Create `resources/views/receipts/sale.blade.php` — nullable-safe header, absolute-path/base64 logo
+- [x] 4.4 Create `ReceiptService::generate(Sale, ?Tenant): string` (dompdf)
+- [x] 4.5 Create `ReceiptMail` (attach PDF via `Attachment::fromData`)
+- [x] 4.6 Create `SaleReceiptController` (show/send); routes `GET /sales/{id}/receipt` (`scope:sales:read`) + `POST .../send` (`scope:sales:read` + `role:admin`)
+- [x] 4.7 Run `vendor/bin/pint --dirty`
 
 ## Phase 5: Verification
 

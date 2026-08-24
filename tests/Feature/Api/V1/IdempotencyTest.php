@@ -235,6 +235,8 @@ class IdempotencyTest extends TestCase
         $wcOrderId = 999888;
 
         // Simulate first webhook delivery
+        // After PR 3, the unique constraint is on the generated column
+        // wc_order_id_active (= wc_order_id when deleted_at IS NULL)
         Sale::upsert(
             [[
                 'wc_order_id' => $wcOrderId,
@@ -243,7 +245,7 @@ class IdempotencyTest extends TestCase
                 'payment_method' => 'credit_card',
                 'paid_at' => now(),
             ]],
-            ['wc_order_id'],
+            ['wc_order_id_active'],
             ['total', 'payment_method', 'paid_at']
         );
 
@@ -258,7 +260,7 @@ class IdempotencyTest extends TestCase
                 'payment_method' => 'credit_card',
                 'paid_at' => now(),
             ]],
-            ['wc_order_id'],
+            ['wc_order_id_active'],
             ['total', 'payment_method', 'paid_at']
         );
 

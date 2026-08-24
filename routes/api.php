@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\PackSessionController;
 use App\Http\Controllers\Api\V1\ProviderController;
 use App\Http\Controllers\Api\V1\RegionController;
 use App\Http\Controllers\Api\V1\SaleController;
+use App\Http\Controllers\Api\V1\SaleReceiptController;
 use App\Http\Controllers\Api\V1\ServiceController;
 use App\Http\Controllers\Api\V1\ServicePackController;
 use App\Http\Controllers\Api\V1\TenantController;
@@ -116,6 +117,10 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
         [SaleController::class, 'registerTransaction'])->middleware(['scope:sales:read', 'role:admin']);
     Route::delete('/sales/{id}/transactions/{transactionId}',
         [SaleController::class, 'destroyTransaction'])->middleware(['scope:sales:read', 'role:admin']);
+
+    // Receipts
+    Route::get('/sales/{id}/receipt', [SaleReceiptController::class, 'show'])->middleware('scope:sales:read');
+    Route::post('/sales/{id}/receipt/send', [SaleReceiptController::class, 'send'])->middleware(['scope:sales:read', 'role:admin']);
 
     // Custom attributes
     Route::get('/custom_attributes', [CustomAttributeController::class, 'index'])
