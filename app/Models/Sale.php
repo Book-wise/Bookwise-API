@@ -4,9 +4,12 @@ namespace App\Models;
 
 use App\Enums\PaymentMethod;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Sale extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'booking_id', 'client_pack_id', 'client_id', 'wc_order_id',
         'total', 'paid_amount', 'payment_method', 'paid_at',

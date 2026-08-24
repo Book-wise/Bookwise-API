@@ -108,6 +108,7 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
     Route::post('/sales', [SaleController::class, 'store'])->middleware(['scope:sales:read', 'role:admin']);
     Route::get('/sales/{id}', [SaleController::class, 'show'])->middleware('scope:sales:read');
     Route::patch('/sales/{id}', [SaleController::class, 'update'])->middleware(['scope:sales:read', 'role:admin']);
+    Route::delete('/sales/{id}', [SaleController::class, 'destroy'])->middleware(['scope:sales:read', 'role:admin']);
 
     Route::get('/sales/{id}/transactions',
         [SaleController::class, 'listTransactions'])->middleware('scope:sales:read');

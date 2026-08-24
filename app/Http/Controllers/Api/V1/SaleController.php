@@ -330,6 +330,16 @@ class SaleController extends Controller
         ], 201);
     }
 
+    // ── DELETE /v1/sales/{id} ──────────────────────────────────────
+    public function destroy(int $id): JsonResponse
+    {
+        $sale = Sale::findOrFail($id);
+
+        $sale->delete();
+
+        return response()->json(null, 204);
+    }
+
     // ── DELETE /v1/sales/{id}/transactions/{transactionId} ────────
     public function destroyTransaction(int $id, int $transactionId): JsonResponse
     {
