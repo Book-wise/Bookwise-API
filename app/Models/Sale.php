@@ -58,12 +58,12 @@ class Sale extends Model
         $total = (float) $this->total;
 
         if ($paid <= 0) {
-            return 'unpaid';
+            return 'Pendiente';
         }
         if ($paid >= $total) {
-            return 'paid';
+            return 'Pagado';
         }
 
-        return 'partial';
+        return 'Parcial';
     }
 }
