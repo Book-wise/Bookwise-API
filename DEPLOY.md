@@ -534,3 +534,10 @@ crontab -l
 # Ejecutar manualmente para ver errores
 php artisan app:send-booking-reminders
 ```
+
+---
+
+> [!info] Navegación Obsidian
+> - [[index|Índice de documentación]]
+> - [[README|README]]
+> - [[notifications-contract|Contrato de notificaciones]]

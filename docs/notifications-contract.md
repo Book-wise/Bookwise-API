@@ -1,6 +1,32 @@
+---
+title: "Contrato de integración — Notificaciones y recordatorios"
+type: contract
+status: implemented
+tags:
+  - api
+  - frontend
+  - notifications
+  - carlitox
+created: 2026-09-01
+updated: 2026-09-01
+prs:
+  - "#27"
+  - "#28"
+  - "#29"
+  - "#30"
+aliases:
+  - Contrato notificaciones
+  - Notification contract
+---
+
 # Contrato de integración — Notificaciones y recordatorios (backend → frontend)
 
 **Estado**: implementado y mergeado en `develop` (PRs #27-#30). Este es el contrato vigente.
+
+> [!info] Notas relacionadas
+> - [[index|Índice de documentación]]
+> - [[DEPLOY|Deploy]]
+> - [[README|README del proyecto]]
 
 ## 1. Dónde viven las preferencias
 

@@ -372,3 +372,10 @@ Consulta la **[guía completa de deploy → DEPLOY.md](DEPLOY.md)** con instrucc
 - [ ] **Fase 8** — Tests unitarios (SlotAvailabilityService) e integración (BookingController, WebhookController)
 - [ ] **~~Fase 9 — Deploy~~** ✅ Documentado en [DEPLOY.md](DEPLOY.md)
 - [ ] **Fase 10** — Verificación HTTPS + CORS en producción (`kinesilk.cl`)
+
+---
+
+> [!info] Navegación Obsidian
+> - [[index|Índice de documentación]]
+> - [[DEPLOY|Deploy]]
+> - [[notifications-contract|Contrato de notificaciones]]
