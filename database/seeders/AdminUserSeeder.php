@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str;
 
 /**
  * Crea o resetea el usuario administrador del backend, asociado al tenant
@@ -14,17 +13,22 @@ use Illuminate\Support\Str;
  * Uso (idempotente — se puede correr varias veces sin duplicar):
  *   php artisan db:seed --class=AdminUserSeeder
  *
- * Configurable por .env (opcional):
- *   ADMIN_EMAIL    = admin@kinesilk.cl   (email del admin)
- *   ADMIN_PASSWORD = <password>          (si no se define, genera uno aleatorio y lo imprime)
- *   ADMIN_TENANT_ID = <id>               (si no se define, usa el primer tenant existente)
+ * Valores por defecto (según convención del equipo):
+ *   email    = admin@kinesilk.cl
+ *   password = password
+ *   tenant   = Bookwise (el negocio con locations, providers y bookings)
+ *
+ * Overrides opcionales por .env:
+ *   ADMIN_EMAIL      = admin@kinesilk.cl
+ *   ADMIN_PASSWORD   = password
+ *   ADMIN_TENANT_ID  = <id>  (si no se define, busca el tenant Bookwise / el primero)
  */
 class AdminUserSeeder extends Seeder
 {
     public function run(): void
     {
         $email = env('ADMIN_EMAIL', 'admin@kinesilk.cl');
-        $password = env('ADMIN_PASSWORD', Str::password(16)); // 16 chars, mayúscula+número+símbolo
+        $password = env('ADMIN_PASSWORD', 'password');
         $tenantId = env('ADMIN_TENANT_ID');
 
         $this->command->info('══════════════════════════════════════════════════════════');
