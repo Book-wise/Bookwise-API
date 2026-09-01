@@ -25,6 +25,11 @@ class Client extends Model
         return $this->hasMany(Booking::class);
     }
 
+    public function sales()
+    {
+        return $this->hasMany(Sale::class);
+    }
+
     public function customAttributes()
     {
         return $this->hasMany(ClientCustomAttribute::class);
