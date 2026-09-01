@@ -126,9 +126,35 @@ class ClientController extends Controller
             'gender' => ['sometimes', 'nullable', 'in:male,female,other'],
             'wc_customer_id' => ['sometimes', 'nullable', 'integer'],
             'notes' => ['sometimes', 'nullable', 'string'],
+            'notifications_enabled' => ['sometimes', 'boolean'],
+            'notification_prefs' => ['sometimes', 'array'],
+            'notification_prefs.email_new_booking' => ['sometimes', 'boolean'],
+            'notification_prefs.email_booking_confirmation' => ['sometimes', 'boolean'],
+            'notification_prefs.email_booking_cancellation' => ['sometimes', 'boolean'],
+            'notification_prefs.whatsapp_reminder' => ['sometimes', 'boolean'],
+            'notification_prefs.whatsapp_cancellation_confirmation' => ['sometimes', 'boolean'],
         ]);
 
-        $client->update($validated);
+        $prefsInput = $request->input('notification_prefs');
+        if ($prefsInput !== null) {
+            $known = [
+                'email_new_booking', 'email_booking_confirmation', 'email_booking_cancellation',
+                'whatsapp_reminder', 'whatsapp_cancellation_confirmation',
+            ];
+            $unknown = array_diff(array_keys($prefsInput), $known);
+
+            if ($unknown !== []) {
+                return response()->json([
+                    'error' => 'validation',
+                    'detail' => 'Unknown notification_prefs key(s): '.implode(', ', $unknown),
+                ], 422);
+            }
+        }
+
+        $client->update([
+            ...array_diff_key($validated, ['notification_prefs' => null]),
+            ...($validated['notification_prefs'] ?? []),
+        ]);
 
         return response()->json(['data' => new ClientResource($client->fresh())]);
     }

@@ -22,6 +22,14 @@ class ClientResource extends JsonResource
             'address' => $this->address,
             'notes' => $this->notes,
             'active' => $this->active,
+            'notifications_enabled' => (bool) $this->notifications_enabled,
+            'notification_prefs' => [
+                'email_new_booking' => (bool) $this->email_new_booking,
+                'email_booking_confirmation' => (bool) $this->email_booking_confirmation,
+                'email_booking_cancellation' => (bool) $this->email_booking_cancellation,
+                'whatsapp_reminder' => (bool) $this->whatsapp_reminder,
+                'whatsapp_cancellation_confirmation' => (bool) $this->whatsapp_cancellation_confirmation,
+            ],
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }
