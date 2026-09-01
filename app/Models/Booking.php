@@ -18,6 +18,7 @@ class Booking extends Model
         'end_time', 'custom_duration_minutes',
         'price', 'notes', 'wc_order_id',
         'created_via', 'last_modified_via',
+        'reminder_24h_sent_at', 'reminder_30m_sent_at',
     ];
 
     protected $casts = [
@@ -27,6 +28,8 @@ class Booking extends Model
         'custom_duration_minutes' => 'integer',
         'created_via' => BookingSource::class,
         'last_modified_via' => BookingSource::class,
+        'reminder_24h_sent_at' => 'datetime',
+        'reminder_30m_sent_at' => 'datetime',
     ];
 
     // ── Relaciones ─────────────────────────────────────────────────

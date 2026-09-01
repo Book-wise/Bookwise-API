@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\V1\BookingResource;
 use App\Http\Resources\V1\ClientResource;
+use App\Http\Resources\V1\SaleResource;
 use App\Models\Client;
 use App\Rules\ChileanRutRule;
 use App\Services\IdempotencyService;
@@ -124,9 +126,35 @@ class ClientController extends Controller
             'gender' => ['sometimes', 'nullable', 'in:male,female,other'],
             'wc_customer_id' => ['sometimes', 'nullable', 'integer'],
             'notes' => ['sometimes', 'nullable', 'string'],
+            'notifications_enabled' => ['sometimes', 'boolean'],
+            'notification_prefs' => ['sometimes', 'array'],
+            'notification_prefs.email_new_booking' => ['sometimes', 'boolean'],
+            'notification_prefs.email_booking_confirmation' => ['sometimes', 'boolean'],
+            'notification_prefs.email_booking_cancellation' => ['sometimes', 'boolean'],
+            'notification_prefs.whatsapp_reminder' => ['sometimes', 'boolean'],
+            'notification_prefs.whatsapp_cancellation_confirmation' => ['sometimes', 'boolean'],
         ]);
 
-        $client->update($validated);
+        $prefsInput = $request->input('notification_prefs');
+        if ($prefsInput !== null) {
+            $known = [
+                'email_new_booking', 'email_booking_confirmation', 'email_booking_cancellation',
+                'whatsapp_reminder', 'whatsapp_cancellation_confirmation',
+            ];
+            $unknown = array_diff(array_keys($prefsInput), $known);
+
+            if ($unknown !== []) {
+                return response()->json([
+                    'error' => 'validation',
+                    'detail' => 'Unknown notification_prefs key(s): '.implode(', ', $unknown),
+                ], 422);
+            }
+        }
+
+        $client->update([
+            ...array_diff_key($validated, ['notification_prefs' => null]),
+            ...($validated['notification_prefs'] ?? []),
+        ]);
 
         return response()->json(['data' => new ClientResource($client->fresh())]);
     }
@@ -146,5 +174,31 @@ class ClientController extends Controller
         $client->update(['active' => false]);
 
         return response()->json(['data' => new ClientResource($client->fresh())]);
+    }
+
+    // ── GET /v1/clients/{id}/bookings — historial paginado ────────
+    public function bookings(int $id, Request $request): JsonResponse
+    {
+        $client = Client::findOrFail($id);
+
+        $bookings = $client->bookings()
+            ->with(['service', 'provider', 'location', 'status'])
+            ->orderBy('start_time', 'desc')
+            ->paginate($request->per_page ?? 20);
+
+        return response()->json(BookingResource::collection($bookings));
+    }
+
+    // ── GET /v1/clients/{id}/payments — historial paginado ────────
+    public function payments(int $id, Request $request): JsonResponse
+    {
+        $client = Client::findOrFail($id);
+
+        $sales = $client->sales()
+            ->with(['transactions'])
+            ->orderBy('created_at', 'desc')
+            ->paginate($request->per_page ?? 20);
+
+        return response()->json(SaleResource::collection($sales));
     }
 }

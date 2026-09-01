@@ -83,6 +83,10 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
         ->middleware('scope:clients:read');
     Route::get('/clients/{id}/packs', [ClientPackController::class, 'clientPacks'])
         ->middleware('scope:clients:read');
+    Route::get('/clients/{id}/bookings', [ClientController::class, 'bookings'])
+        ->middleware('scope:clients:read');
+    Route::get('/clients/{id}/payments', [ClientController::class, 'payments'])
+        ->middleware('scope:clients:read');
 
     // Locations (solo admin puede crear o modificar)
     Route::post('/locations', [LocationController::class, 'store'])
