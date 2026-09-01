@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\V1;
 
-use App\Rules\ChileanRutRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class TenantSettingsRequest extends FormRequest
@@ -11,7 +10,10 @@ class TenantSettingsRequest extends FormRequest
     {
         return [
             'business_name' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'business_rut' => ['sometimes', 'nullable', 'string', 'max:255', new ChileanRutRule],
+            // BR12/D9: business_rut and business_email are immutable once
+            // set during onboarding — any attempt to change them yields 422.
+            'business_rut' => ['prohibited'],
+            'business_email' => ['prohibited'],
         ];
     }
 }

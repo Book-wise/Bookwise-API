@@ -112,7 +112,7 @@ class TenantSettingsTest extends TestCase
         ]);
     }
 
-    public function test_patch_creates_profile_on_first_write(): void
+    public function test_patch_without_tenant_returns_409_onboarding_required(): void
     {
         $this->authenticateAs($this->admin);
 
@@ -120,20 +120,14 @@ class TenantSettingsTest extends TestCase
             'business_name' => 'First Write',
         ]);
 
-        $response->assertStatus(200);
-        $response->assertJson([
-            'business_name' => 'First Write',
-            'business_rut' => null,
-        ]);
+        $response->assertStatus(409);
+        $response->assertJson(['error' => 'onboarding_required']);
 
-        $this->assertDatabaseHas('tenants', [
-            'business_name' => 'First Write',
-        ]);
-
-        $this->assertNotNull($this->admin->fresh()->tenant_id);
+        $this->assertDatabaseCount('tenants', 0);
+        $this->assertNull($this->admin->fresh()->tenant_id);
     }
 
-    public function test_patch_accepts_valid_rut(): void
+    public function test_patch_rejects_business_rut(): void
     {
         $this->associateTenant($this->admin);
 
@@ -143,13 +137,12 @@ class TenantSettingsTest extends TestCase
             'business_rut' => '11111111-1',
         ]);
 
-        $response->assertStatus(200);
-        $response->assertJson([
-            'business_rut' => '11111111-1',
-        ]);
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['business_rut']);
+        $this->assertNull($this->admin->fresh()->tenant->business_rut);
     }
 
-    public function test_patch_rejects_invalid_rut(): void
+    public function test_patch_rejects_any_business_rut_value(): void
     {
         $this->associateTenant($this->admin);
 
@@ -161,6 +154,22 @@ class TenantSettingsTest extends TestCase
 
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['business_rut']);
+        $this->assertNull($this->admin->fresh()->tenant->business_rut);
+    }
+
+    public function test_patch_rejects_business_email(): void
+    {
+        $this->associateTenant($this->admin, ['business_email' => 'dueno@kinesilk.cl']);
+
+        $this->authenticateAs($this->admin);
+
+        $response = $this->patchJson('/api/v1/tenant/settings', [
+            'business_email' => 'otro@kinesilk.cl',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['business_email']);
+        $this->assertSame('dueno@kinesilk.cl', $this->admin->fresh()->tenant->business_email);
     }
 
     public function test_patch_rejects_overlength_business_name(): void
@@ -182,6 +191,7 @@ class TenantSettingsTest extends TestCase
     public function test_logo_upload_succeeds_and_optimizes(): void
     {
         Storage::fake('public');
+        $this->associateTenant($this->admin);
         $this->authenticateAs($this->admin);
 
         $response = $this->postJson('/api/v1/tenant/settings/logo', [
@@ -199,6 +209,22 @@ class TenantSettingsTest extends TestCase
         [$width, $height] = getimagesize(Storage::disk('public')->path($relative));
         $this->assertSame(200, $width);
         $this->assertSame(150, $height);
+    }
+
+    public function test_logo_upload_without_tenant_returns_409(): void
+    {
+        Storage::fake('public');
+        $this->authenticateAs($this->admin);
+
+        $response = $this->postJson('/api/v1/tenant/settings/logo', [
+            'logo' => UploadedFile::fake()->image('logo.png', 400, 300),
+        ]);
+
+        $response->assertStatus(409);
+        $response->assertJson(['error' => 'onboarding_required']);
+
+        $this->assertDatabaseCount('tenants', 0);
+        $this->assertNull($this->admin->fresh()->tenant_id);
     }
 
     public function test_logo_upload_rejects_invalid_mime(): void
@@ -230,6 +256,7 @@ class TenantSettingsTest extends TestCase
     public function test_logo_upload_replaces_previous_file(): void
     {
         Storage::fake('public');
+        $this->associateTenant($this->admin);
         $this->authenticateAs($this->admin);
 
         $first = $this->postJson('/api/v1/tenant/settings/logo', [
@@ -261,6 +288,7 @@ class TenantSettingsTest extends TestCase
     public function test_logo_upload_returns_501_when_gd_unavailable(): void
     {
         Storage::fake('public');
+        $this->associateTenant($this->admin);
 
         $this->mock(LogoService::class, function (MockInterface $mock) {
             $mock->shouldReceive('store')

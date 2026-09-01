@@ -27,7 +27,14 @@ class TenantController extends Controller
     // ── PATCH /v1/tenant/settings ───────────────────────────────────
     public function update(TenantSettingsRequest $request): JsonResponse
     {
-        $tenant = $this->resolveTenant();
+        $tenant = auth()->user()->tenant;
+
+        if (! $tenant) {
+            return response()->json([
+                'error' => 'onboarding_required',
+                'detail' => 'Debes completar el onboarding de tu negocio antes de configurar los ajustes.',
+            ], 409);
+        }
 
         $tenant->update($request->validated());
         $tenant->refresh();
@@ -38,7 +45,14 @@ class TenantController extends Controller
     // ── POST /v1/tenant/settings/logo ───────────────────────────────
     public function uploadLogo(LogoUploadRequest $request): JsonResponse
     {
-        $tenant = $this->resolveTenant();
+        $tenant = auth()->user()->tenant;
+
+        if (! $tenant) {
+            return response()->json([
+                'error' => 'onboarding_required',
+                'detail' => 'Debes completar el onboarding de tu negocio antes de subir un logo.',
+            ], 409);
+        }
 
         try {
             $url = $this->logoService->store($request->file('logo'), $tenant);
@@ -52,21 +66,6 @@ class TenantController extends Controller
         $tenant->update(['business_logo_url' => $url]);
 
         return response()->json(['business_logo_url' => $url]);
-    }
-
-    private function resolveTenant(): Tenant
-    {
-        $user = auth()->user();
-
-        if ($user->tenant) {
-            return $user->tenant;
-        }
-
-        $tenant = Tenant::create([]);
-
-        $user->tenant()->associate($tenant)->save();
-
-        return $tenant;
     }
 
     /**
