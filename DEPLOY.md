@@ -456,6 +456,19 @@ php artisan view:cache
 php artisan event:cache
 ```
 
+> [!warning] ⚠️ NUNCA saltear `php artisan migrate --force` después de un pull
+> Las features nuevas traen migraciones pendientes. Si no las aplicás, la API responde `500` con `SQLSTATE[42S22]: Column not found: Unknown column 'xxx' in 'field list'` cuando el front intenta escribir en columnas que todavía no existen en la base.
+>
+> Verificá que no haya migraciones pendientes con:
+>
+> ```bash
+> php artisan migrate:status
+> ```
+>
+> Si alguna línea figura como `Pending`, corré `php artisan migrate --force` antes de probar la feature.
+>
+> Ejemplo real (septiembre 2026): la feature de notificaciones (`notification_prefs`) se mergeó y pusheó a `develop`, pero la migración `2026_08_31_155942_add_notification_prefs_to_clients_and_start_time_index` no se había corrido en la base local → el PATCH de `email_new_booking` fallaba con `Column not found`.
+
 ### Monitorear logs
 
 ```bash
