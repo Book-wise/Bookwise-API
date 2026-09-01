@@ -21,6 +21,10 @@ class TenantFactory extends Factory
             'business_name' => fake()->company(),
             'business_rut' => null,
             'business_logo_url' => null,
+            'business_email' => null,
+            'business_address' => null,
+            'business_phone' => null,
+            'business_plan' => 'starter',
         ];
     }
 }

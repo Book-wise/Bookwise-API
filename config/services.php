@@ -46,4 +46,11 @@ return [
         'webhook_url' => env('CARLITOX_WEBHOOK_URL'),
     ],
 
+    'frontend' => [
+        // Base URL of the frontend, used to build email-verification links
+        // (FRONTEND_URL/verify-email?token=...) delivered via carlitox.
+        // Blank value makes the verification job fail loudly (R2.4/D1).
+        'url' => env('FRONTEND_URL'),
+    ],
+
 ];

@@ -7,11 +7,13 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'role', 'provider_id', 'tenant_id'])]
+#[Fillable(['name', 'email', 'phone', 'password', 'role', 'provider_id', 'tenant_id'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -27,14 +29,25 @@ class User extends Authenticatable
         ];
     }
 
-    public function provider()
+    public function provider(): BelongsTo
     {
         return $this->belongsTo(Provider::class);
     }
 
-    public function tenant()
+    public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    /**
+     * Business roles held by this user, scoped per tenant through the
+     * user_role pivot (unique triple user_id + tenant_id + role_id).
+     */
+    public function roles(): BelongsToMany
+    {
+        return $this->belongsToMany(Role::class, 'user_role')
+            ->withPivot('tenant_id')
+            ->withTimestamps();
     }
 
     public function isAdmin(): bool
@@ -45,5 +58,10 @@ class User extends Authenticatable
     public function isProvider(): bool
     {
         return $this->role === UserRole::PROVIDER;
+    }
+
+    public function isVerified(): bool
+    {
+        return $this->email_verified_at !== null;
     }
 }
