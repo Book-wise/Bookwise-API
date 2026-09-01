@@ -42,4 +42,8 @@ return [
         'store_url' => env('WC_STORE_URL'),
     ],
 
+    'carlitox' => [
+        'webhook_url' => env('CARLITOX_WEBHOOK_URL'),
+    ],
+
 ];

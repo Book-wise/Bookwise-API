@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V1;
 
 use App\Jobs\ProcessWooCommerceWebhook;
+use App\Jobs\PushNotificationToCarlitox;
 use App\Models\Booking;
 use App\Models\BookingStatus;
 use App\Models\Client;
@@ -36,6 +37,9 @@ class WebhookOrderCompletedTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Isolate only the notification push job; webhook jobs still run inline (sync).
+        Queue::fake([PushNotificationToCarlitox::class]);
 
         config(['services.woocommerce.webhook_secret' => $this->webhookSecret]);
 

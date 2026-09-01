@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V1;
 
 use App\Enums\UserRole;
+use App\Jobs\PushNotificationToCarlitox;
 use App\Models\Booking;
 use App\Models\BookingStatus;
 use App\Models\Client;
@@ -11,6 +12,7 @@ use App\Models\Service;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class TimezoneBookingTest extends TestCase
@@ -32,6 +34,8 @@ class TimezoneBookingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        Queue::fake([PushNotificationToCarlitox::class]);
 
         $this->puntaArenas = Location::create([
             'name' => 'Kinesilk Punta Arenas',
