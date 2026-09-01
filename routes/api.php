@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\AvailableSlotsController;
 use App\Http\Controllers\Api\V1\BlockedSlotController;
 use App\Http\Controllers\Api\V1\BookingController;
+use App\Http\Controllers\Api\V1\BusinessController;
 use App\Http\Controllers\Api\V1\ClientController;
 use App\Http\Controllers\Api\V1\ClientPackController;
 use App\Http\Controllers\Api\V1\ConfigController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PackSessionController;
 use App\Http\Controllers\Api\V1\ProviderController;
 use App\Http\Controllers\Api\V1\RegionController;
+use App\Http\Controllers\Api\V1\RoleController;
 use App\Http\Controllers\Api\V1\SaleController;
 use App\Http\Controllers\Api\V1\SaleReceiptController;
 use App\Http\Controllers\Api\V1\ServiceController;
@@ -30,7 +32,9 @@ Route::post('/v1/webhooks/woocommerce', [WebhookController::class, 'handle'])
 
 // Auth
 Route::middleware('throttle:api_public')->prefix('v1')->group(function () {
+    Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::patch('/auth/verify-email', [AuthController::class, 'verifyEmail']);
     Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 });
 
@@ -108,6 +112,9 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
     Route::patch('/providers/{id}', [ProviderController::class, 'update'])
         ->middleware('scope:providers:write')
         ->middleware('role:admin');
+    Route::patch('/providers/{id}/roles', [ProviderController::class, 'assignRoles'])
+        ->middleware('scope:providers:write')
+        ->middleware('role:admin');
 
     // Sales
     Route::get('/sales', [SaleController::class, 'index'])->middleware('scope:sales:read');
@@ -160,10 +167,23 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
         ->middleware('scope:bookings:write')
         ->middleware('ownership:'.BlockedSlot::class.',repeatGroupId');
 
+    // Business onboarding — no scope: any authenticated user can read/create
+    // their own business profile (R9.1/R9.2)
+    Route::get('/businesses', [BusinessController::class, 'index']);
+    Route::post('/businesses', [BusinessController::class, 'store']);
+
+    // Roles catalog — global business-role definitions, admin only, no
+    // tenant required (R11.1); the assignment endpoint enforces onboarding
+    Route::get('/roles', [RoleController::class, 'index'])->middleware('role:admin');
+
     // Tenant settings — admin only, resolved from the authenticated user's tenant
     Route::get('/tenant/settings', [TenantController::class, 'show'])->middleware('role:admin');
     Route::patch('/tenant/settings', [TenantController::class, 'update'])->middleware('role:admin');
     Route::post('/tenant/settings/logo', [TenantController::class, 'uploadLogo'])->middleware('role:admin');
+
+    // Me — authenticated user's own profile (R10.1); no scope. The
+    // client-scoped /me below is a different, untouched endpoint.
+    Route::get('/auth/me', [AuthController::class, 'me']);
 
     // Me
     Route::get('/me', [ClientController::class, 'me'])->middleware('scope:clients:read');
