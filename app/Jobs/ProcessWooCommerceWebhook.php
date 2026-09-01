@@ -3,6 +3,9 @@
 namespace App\Jobs;
 
 use App\Enums\BookingSource;
+use App\Events\BookingCancelled;
+use App\Events\BookingConfirmed;
+use App\Events\BookingCreated;
 use App\Models\Booking;
 use App\Models\BookingStatus;
 use App\Models\Sale;
@@ -201,7 +204,9 @@ class ProcessWooCommerceWebhook implements ShouldBeUnique, ShouldQueue
             : now();
 
         // Step 7: Create booking and sale atomically
-        DB::transaction(function () use ($data, $orderId, $client, $meta, $confirmedStatus, $paidAt, $bookingService, $saleService) {
+        $createdBooking = null;
+
+        DB::transaction(function () use (&$createdBooking, $data, $orderId, $client, $meta, $confirmedStatus, $paidAt, $bookingService, $saleService) {
             $booking = $bookingService->findOrCreateBooking(
                 [
                     'wc_order_id' => $orderId,
@@ -218,6 +223,8 @@ class ProcessWooCommerceWebhook implements ShouldBeUnique, ShouldQueue
                 BookingSource::OnlineWebhook
             );
 
+            $createdBooking = $booking;
+
             $booking->statusHistory()->create([
                 'status_id' => $confirmedStatus->id,
                 'notes' => 'Confirmed via WooCommerce order #'.$orderId,
@@ -230,6 +237,12 @@ class ProcessWooCommerceWebhook implements ShouldBeUnique, ShouldQueue
                 'paid_at' => $paidAt,
             ]);
         });
+
+        // Only a newly created booking pushes lifecycle events; replays do not (BR7).
+        if ($createdBooking?->wasRecentlyCreated) {
+            event(new BookingCreated($createdBooking));
+            event(new BookingConfirmed($createdBooking));
+        }
     }
 
     /**
@@ -256,6 +269,8 @@ class ProcessWooCommerceWebhook implements ShouldBeUnique, ShouldQueue
                 'status_id' => $cancelStatus->id,
                 'notes' => 'Cancelled via WooCommerce refund order #'.$orderId,
             ]);
+
+            event(new BookingCancelled($booking->fresh() ?? $booking));
         }
     }
 

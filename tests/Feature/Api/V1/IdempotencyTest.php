@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V1;
 
 use App\Enums\UserRole;
+use App\Jobs\PushNotificationToCarlitox;
 use App\Models\BlockedSlot;
 use App\Models\Booking;
 use App\Models\BookingStatus;
@@ -18,6 +19,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class IdempotencyTest extends TestCase
@@ -37,6 +39,8 @@ class IdempotencyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        Queue::fake([PushNotificationToCarlitox::class]);
 
         $this->location = Location::create([
             'name' => 'Test Location',

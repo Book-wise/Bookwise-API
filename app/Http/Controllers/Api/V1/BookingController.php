@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\BookingSource;
 use App\Enums\UserRole;
+use App\Events\BookingCancelled;
+use App\Events\BookingConfirmed;
+use App\Events\BookingCreated;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\BookingStoreRequest;
 use App\Http\Requests\BookingUpdateRequest;
@@ -203,6 +206,14 @@ class BookingController extends Controller
             $this->idempotency->store($request, $endpoint, 201, ['data' => new BookingResource($booking)]);
         }
 
+        $isCancellation = $booking->status->is_cancellation === true;
+
+        event(new BookingCreated($booking));
+
+        if (! $isCancellation) {
+            event(new BookingConfirmed($booking));
+        }
+
         return response()->json(['data' => new BookingResource($booking)], 201);
     }
 
@@ -345,6 +356,8 @@ class BookingController extends Controller
         if ($hasIdempotencyKey) {
             $this->idempotency->store($request, $endpoint, 200, ['data' => new BookingResource($booking)]);
         }
+
+        event(new BookingCancelled($booking));
 
         return response()->json(['data' => new BookingResource($booking)]);
     }
