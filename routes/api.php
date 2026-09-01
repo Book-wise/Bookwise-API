@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\ClientPackController;
 use App\Http\Controllers\Api\V1\ConfigController;
 use App\Http\Controllers\Api\V1\CustomAttributeController;
 use App\Http\Controllers\Api\V1\LocationController;
+use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PackSessionController;
 use App\Http\Controllers\Api\V1\ProviderController;
 use App\Http\Controllers\Api\V1\RegionController;
@@ -166,6 +167,12 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
 
     // Me
     Route::get('/me', [ClientController::class, 'me'])->middleware('scope:clients:read');
+
+    // Notifications — carlitox polling contract
+    Route::get('/notifications/pending', [NotificationController::class, 'pending'])
+        ->middleware('scope:notifications:read');
+    Route::post('/notifications/reminders/ack', [NotificationController::class, 'ack'])
+        ->middleware('scope:notifications:write');
 
     // Agente conversacional
     Route::get('/agent/check-availability', [AgentController::class, 'checkAvailability'])
