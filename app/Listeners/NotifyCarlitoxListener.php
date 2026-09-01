@@ -5,11 +5,22 @@ namespace App\Listeners;
 use App\Events\BookingCancelled;
 use App\Events\BookingConfirmed;
 use App\Events\BookingCreated;
+use App\Events\UserRegistered;
 use App\Jobs\PushNotificationToCarlitox;
+use App\Jobs\PushVerificationEmailToCarlitox;
 use App\Models\Booking;
 
 class NotifyCarlitoxListener
 {
+    public function handleUserRegistered(UserRegistered $event): void
+    {
+        PushVerificationEmailToCarlitox::dispatch(
+            $event->user,
+            $event->verification,
+            $event->plainToken,
+        );
+    }
+
     public function handleBookingCreated(BookingCreated $event): void
     {
         $this->dispatchFor($event->booking, PushNotificationToCarlitox::EVENT_BOOKING_CREATED);
