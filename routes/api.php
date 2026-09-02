@@ -109,6 +109,8 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
         ->middleware('scope:providers:read');
     Route::get('/providers/{id}', [ProviderController::class, 'show'])
         ->middleware('scope:providers:read');
+    Route::get('/providers/{id}/bookings', [ProviderController::class, 'bookings'])
+        ->middleware('scope:providers:read');
     Route::post('/providers', [ProviderController::class, 'store'])
         ->middleware('scope:providers:write')
         ->middleware('role:admin');

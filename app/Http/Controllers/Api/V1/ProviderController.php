@@ -98,6 +98,40 @@ class ProviderController extends Controller
         return response()->json(['data' => new ProviderResource($provider)]);
     }
 
+    /**
+     * GET /api/v1/providers/{id}/bookings — upcoming bookings pre-check
+     * (support for the calendar deactivation dialog; the PATCH 409 remains the
+     * race-free source of truth).
+     *
+     * Query params: from (Y-m-d H:i, optional, default now), status_ids[]
+     * (optional; when absent the live/final flag predicate is used).
+     */
+    public function bookings(Request $request, int $id, ProviderService $providerService): JsonResponse
+    {
+        $provider = Provider::find($id);
+
+        if (! $provider) {
+            return response()->json([
+                'error' => 'provider_not_found',
+                'detail' => 'El profesional no existe.',
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'from' => ['nullable', 'date'],
+            'status_ids' => ['nullable', 'array'],
+            'status_ids.*' => ['integer', 'exists:booking_statuses,id'],
+        ]);
+
+        return response()->json([
+            'bookings' => $providerService->upcomingBookings(
+                $provider->id,
+                $validated['from'] ?? null,
+                $validated['status_ids'] ?? null,
+            ),
+        ]);
+    }
+
     public function store(ProviderStoreRequest $request): JsonResponse
     {
         $provider = Provider::create($request->validated());
