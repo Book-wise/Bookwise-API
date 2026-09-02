@@ -3,11 +3,16 @@
 namespace Tests\Feature\Api\V1;
 
 use App\Enums\UserRole;
+use App\Models\Booking;
+use App\Models\BookingStatus;
+use App\Models\Client;
 use App\Models\Location;
 use App\Models\Provider;
 use App\Models\Role;
+use App\Models\Service;
 use App\Models\Tenant;
 use App\Models\User;
+use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\TestCase;
@@ -304,5 +309,164 @@ class ProviderCalendarRolesTest extends TestCase
         $empty = $this->json('GET', '/api/v1/providers', ['roles' => []]);
         $empty->assertStatus(200);
         $this->assertCount(2, $empty->json());
+    }
+
+    // ── S-9: staff + staff_readonly union; staff alone excludes readonly ──
+
+    public function test_attendance_set_is_union_of_staff_and_staff_readonly(): void
+    {
+        $staff = $this->makeProvider(['first_name' => 'Ana', 'email' => 'ana@test.com']);
+        $staffUser = $this->makeLinkedUser($staff);
+        $staffUser->roles()->attach($this->roleId('staff'), ['tenant_id' => $this->tenant->id]);
+
+        $readonly = $this->makeProvider(['first_name' => 'Bruno', 'email' => 'bruno@test.com']);
+        $readonlyUser = $this->makeLinkedUser($readonly);
+        $readonlyUser->roles()->attach($this->roleId('staff_readonly'), ['tenant_id' => $this->tenant->id]);
+
+        $this->authenticateAs($this->admin);
+
+        // Attendance = union of the set: both are returned.
+        $union = $this->getJson($this->providersUrl(['roles' => ['staff', 'staff_readonly']]));
+        $union->assertStatus(200);
+        $this->assertCount(2, $union->json());
+
+        // Filtering staff alone excludes the staff_readonly-only provider.
+        $staffOnly = $this->getJson($this->providersUrl(['roles' => ['staff']]));
+        $staffOnly->assertStatus(200);
+        $providers = $staffOnly->json();
+        $this->assertCount(1, $providers);
+        $this->assertSame($staff->id, $providers[0]['id']);
+    }
+
+    // ── S-10: index exposes tenant-scoped nested user.roles ──────────
+
+    public function test_index_exposes_tenant_scoped_nested_user_roles(): void
+    {
+        $otherTenant = $this->makeTenant('Otra Spa');
+
+        // Role-less linked user → user.roles must be [].
+        $roleless = $this->makeProvider(['first_name' => 'Alpha', 'email' => 'alpha@test.com']);
+        $rolelessUser = $this->makeLinkedUser($roleless);
+
+        // Holds staff under the caller tenant AND admin_local under another
+        // tenant: only the caller-tenant role may surface.
+        $hybrid = $this->makeProvider(['first_name' => 'Beta', 'email' => 'beta@test.com']);
+        $hybridUser = $this->makeLinkedUser($hybrid);
+        $hybridUser->roles()->attach($this->roleId('staff'), ['tenant_id' => $this->tenant->id]);
+        $hybridUser->roles()->attach($this->roleId('admin_local'), ['tenant_id' => $otherTenant->id]);
+
+        $this->authenticateAs($this->admin);
+
+        $response = $this->getJson('/api/v1/providers');
+
+        $response->assertStatus(200);
+        $providers = $response->json();
+        $this->assertCount(2, $providers);
+
+        // Alpha: role-less user → roles: [].
+        $this->assertSame($roleless->id, $providers[0]['id']);
+        $response->assertJsonPath('0.user.id', $rolelessUser->id);
+        $this->assertSame([], $providers[0]['user']['roles']);
+
+        // Beta: nested user object with only the caller-tenant role.
+        $this->assertSame($hybrid->id, $providers[1]['id']);
+        $response->assertJsonPath('1.user.id', $hybridUser->id);
+        $response->assertJsonPath('1.user.name', $hybridUser->name);
+        $response->assertJsonPath('1.user.email', $hybridUser->email);
+        $response->assertJsonPath('1.user.roles', [
+            ['slug' => 'staff', 'name' => 'Staff'],
+        ]);
+    }
+
+    // ── S-10: show exposes the same tenant-scoped nested user.roles ──
+
+    public function test_show_exposes_tenant_scoped_nested_user_roles(): void
+    {
+        $otherTenant = $this->makeTenant('Otra Spa');
+
+        $hybrid = $this->makeProvider(['first_name' => 'Beta', 'email' => 'beta@test.com']);
+        $hybridUser = $this->makeLinkedUser($hybrid);
+        $hybridUser->roles()->attach($this->roleId('staff'), ['tenant_id' => $this->tenant->id]);
+        $hybridUser->roles()->attach($this->roleId('admin_local'), ['tenant_id' => $otherTenant->id]);
+
+        $this->authenticateAs($this->admin);
+
+        $response = $this->getJson("/api/v1/providers/{$hybrid->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.user.id', $hybridUser->id);
+        $response->assertJsonPath('data.user.roles', [
+            ['slug' => 'staff', 'name' => 'Staff'],
+        ]);
+    }
+
+    // ── S-11: booking embedding stays byte-compatible (no user key) ──
+
+    public function test_booking_payload_keeps_provider_embed_without_user_key(): void
+    {
+        $provider = $this->makeProvider(['first_name' => 'Ana', 'email' => 'ana@test.com']);
+        $this->makeLinkedUser($provider);
+
+        $service = Service::create([
+            'name' => 'Masaje', 'price' => 30000, 'duration_minutes' => 60,
+        ]);
+        $client = Client::create([
+            'first_name' => 'Test', 'last_name' => 'Client',
+            'email' => 'client@test.com', 'active' => true,
+        ]);
+        $status = BookingStatus::create(['name' => 'Confirmed', 'is_cancellation' => false]);
+        Booking::create([
+            'client_id' => $client->id,
+            'service_id' => $service->id,
+            'provider_id' => $provider->id,
+            'location_id' => $this->location->id,
+            'status_id' => $status->id,
+            'start_time' => Carbon::tomorrow()->addHours(10),
+            'end_time' => Carbon::tomorrow()->addHours(11),
+            'price' => 30000,
+        ]);
+
+        $this->authenticateAs($this->admin);
+
+        $response = $this->getJson('/api/v1/bookings');
+
+        $response->assertStatus(200);
+        // The provider embed is present and rendered...
+        $response->assertJsonPath('0.provider.id', $provider->id);
+        $response->assertJsonPath('0.provider.email', $provider->email);
+        // ...but booking endpoints only load `provider`, never `provider.user`,
+        // so no user/roles keys may appear (byte-compatible payload).
+        $response->assertJsonMissingPath('0.provider.user');
+    }
+
+    // ── S-12: provider without a linked user → user: null, no error ──
+
+    public function test_provider_without_linked_user_shows_null_user(): void
+    {
+        // No linked user at all.
+        $userless = $this->makeProvider(['first_name' => 'Alpha', 'email' => 'alpha@test.com']);
+        $this->assertNull($userless->user);
+
+        // Linked user holding staff under the caller tenant.
+        $linked = $this->makeProvider(['first_name' => 'Beta', 'email' => 'beta@test.com']);
+        $linkedUser = $this->makeLinkedUser($linked);
+        $linkedUser->roles()->attach($this->roleId('staff'), ['tenant_id' => $this->tenant->id]);
+
+        $this->authenticateAs($this->admin);
+
+        $response = $this->getJson('/api/v1/providers');
+
+        $response->assertStatus(200);
+        $providers = $response->json();
+        $this->assertCount(2, $providers);
+
+        // Alpha has no linked user: `user` key present and null, no error.
+        $this->assertSame($userless->id, $providers[0]['id']);
+        $this->assertArrayHasKey('user', $providers[0]);
+        $this->assertNull($providers[0]['user']);
+
+        // Beta keeps its nested user payload.
+        $this->assertSame($linked->id, $providers[1]['id']);
+        $response->assertJsonPath('1.user.id', $linkedUser->id);
     }
 }

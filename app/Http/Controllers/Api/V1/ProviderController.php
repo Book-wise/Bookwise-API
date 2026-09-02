@@ -13,6 +13,7 @@ use App\Models\Provider;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -50,7 +51,15 @@ class ProviderController extends Controller
         }
 
         $providers = Provider::query()
-            ->with(['location', 'services'])
+            ->with([
+                'location',
+                'services',
+                // N+1-free nested roles, scoped to the caller tenant so
+                // foreign-tenant pivot rows never leak (REQ-5/S-10).
+                'user.roles' => fn ($q) => $q
+                    ->wherePivot('tenant_id', $tenantId)
+                    ->orderBy('roles.id'),
+            ])
             ->when($hasRoleFilter, fn ($q) => $q->whereHas(
                 'user.roles',
                 fn ($q) => $q->whereIn('roles.slug', $roles)
@@ -72,9 +81,18 @@ class ProviderController extends Controller
         return response()->json(ProviderResource::collection($providers));
     }
 
-    public function show(int $id): JsonResponse
+    public function show(Request $request, int $id): JsonResponse
     {
-        $provider = Provider::with(['location', 'services'])->findOrFail($id);
+        /** @var User $user */
+        $user = $request->user();
+
+        $provider = Provider::with([
+            'location',
+            'services',
+            'user.roles' => fn ($q) => $q
+                ->wherePivot('tenant_id', $user->tenant_id)
+                ->orderBy('roles.id'),
+        ])->findOrFail($id);
 
         return response()->json(['data' => new ProviderResource($provider)]);
     }
