@@ -13,16 +13,20 @@ use App\Models\Service;
 use App\Models\Tenant;
 use App\Models\User;
 use Carbon\Carbon;
+use Database\Seeders\ProviderCalendarRoleSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
  * Covers the provider calendar attendance roles contract: the `roles[]`
- * filter on GET /providers (REQ-1..REQ-3) and the tenant-scoped nested
- * `user.roles` payload on provider index/show (REQ-4..REQ-5). Fixtures and
- * helpers mirror ProviderRolesTest (no ProviderFactory exists; users.role
- * has no DB default, so every linked User fixture sets the role explicitly).
+ * filter on GET /providers (REQ-1..REQ-3), the tenant-scoped nested
+ * `user.roles` payload on provider index/show (REQ-4..REQ-5), and the
+ * email-keyed ProviderCalendarRoleSeeder tenant-1 attendance roles
+ * (REQ-6 / S-13..S-15). Fixtures and helpers mirror ProviderRolesTest
+ * (no ProviderFactory exists; users.role has no DB default, so every
+ * linked User fixture sets the role explicitly).
  */
 class ProviderCalendarRolesTest extends TestCase
 {
@@ -437,6 +441,209 @@ class ProviderCalendarRolesTest extends TestCase
         // ...but booking endpoints only load `provider`, never `provider.user`,
         // so no user/roles keys may appear (byte-compatible payload).
         $response->assertJsonMissingPath('0.provider.user');
+    }
+
+    // ── Seeder fixtures (S-13..S-15) ───────────────────────────────
+
+    /**
+     * Creates one provider per ProviderCalendarRoleSeeder::EMAIL_ROLE_MAP entry,
+     * each with a real linked user whose email equals the provider email
+     * (prod shape: provider users carry tenant_id NULL — the user_role pivot
+     * is the tenant-scoped source of truth).
+     *
+     * @return array<string, Provider> map email => provider
+     */
+    private function createRealKinesilkProviders(): array
+    {
+        $providers = [];
+
+        foreach (ProviderCalendarRoleSeeder::EMAIL_ROLE_MAP as $email => $slug) {
+            $provider = $this->makeProvider([
+                'first_name' => ucfirst((string) strstr($email, '@', true)),
+                'email' => $email,
+            ]);
+
+            User::factory()->create([
+                'role' => UserRole::PROVIDER,
+                'email' => $email,
+                'provider_id' => $provider->id,
+                'tenant_id' => null,
+            ]);
+
+            $providers[$email] = $provider;
+        }
+
+        return $providers;
+    }
+
+    // ── S-13: seeder happy path — email-keyed assignment under tenant 1 ──
+
+    public function test_seeder_assigns_attendance_roles_to_real_kinesilk_provider_users(): void
+    {
+        $providers = $this->createRealKinesilkProviders();
+
+        $this->artisan('db:seed', ['--class' => ProviderCalendarRoleSeeder::class])
+            ->assertSuccessful();
+
+        // Exactly 10 rows: 9 staff + 1 staff_readonly, all under tenant 1 (S-13).
+        $this->assertDatabaseCount('user_role', 10);
+
+        foreach (ProviderCalendarRoleSeeder::EMAIL_ROLE_MAP as $email => $slug) {
+            $provider = $providers[$email];
+            $user = User::where('provider_id', $provider->id)->where('email', $email)->firstOrFail();
+
+            $this->assertDatabaseHas('user_role', [
+                'user_id' => $user->id,
+                'tenant_id' => $this->tenant->id,
+                'role_id' => $this->roleId($slug),
+            ]);
+        }
+
+        $staffCount = DB::table('user_role')
+            ->where('tenant_id', $this->tenant->id)
+            ->where('role_id', $this->roleId('staff'))
+            ->count();
+        $readonlyCount = DB::table('user_role')
+            ->where('tenant_id', $this->tenant->id)
+            ->where('role_id', $this->roleId('staff_readonly'))
+            ->count();
+
+        $this->assertSame(9, $staffCount);
+        $this->assertSame(1, $readonlyCount);
+    }
+
+    // ── S-14: idempotent re-run — pivot state identical, no duplicates ──
+
+    public function test_seeder_rerun_is_idempotent_and_replaces_stale_tenant_roles(): void
+    {
+        $providers = $this->createRealKinesilkProviders();
+        $maria = User::where('email', 'maria@kinesilk.cl')->firstOrFail();
+
+        // First run: clean assignment.
+        $this->artisan('db:seed', ['--class' => ProviderCalendarRoleSeeder::class])
+            ->assertSuccessful();
+
+        $firstRun = DB::table('user_role')
+            ->where('tenant_id', $this->tenant->id)
+            ->orderBy('user_id')->orderBy('role_id')
+            ->get(['user_id', 'role_id', 'tenant_id'])
+            ->all();
+
+        // Mutate the pivot state before the re-run: Maria (provider 1) gets a
+        // stale tenant-1 role she no longer should hold, plus an unrelated
+        // role under a second tenant that replace semantics must NOT touch.
+        $maria->roles()->attach($this->roleId('admin_local'), ['tenant_id' => $this->tenant->id]);
+        $otherTenant = $this->makeTenant('Otra Spa');
+        $maria->roles()->attach($this->roleId('recepcionista'), ['tenant_id' => $otherTenant->id]);
+
+        // Re-run must restore the exact post-first-run state under tenant 1 (S-14).
+        $this->artisan('db:seed', ['--class' => ProviderCalendarRoleSeeder::class])
+            ->assertSuccessful();
+
+        // Exactly the 10 tenant-1 rows again (the stale admin_local was replaced;
+        // the foreign-tenant recepcionista row legitimately remains, so the total
+        // row count is 11 — tenant-1 state is what replace semantics guarantees).
+        $this->assertSame(10, DB::table('user_role')->where('tenant_id', $this->tenant->id)->count());
+
+        $secondRun = DB::table('user_role')
+            ->where('tenant_id', $this->tenant->id)
+            ->orderBy('user_id')->orderBy('role_id')
+            ->get(['user_id', 'role_id', 'tenant_id'])
+            ->all();
+
+        $this->assertEquals($firstRun, $secondRun);
+
+        // Maria: stale tenant-1 admin_local replaced by staff; the foreign-tenant
+        // recepcionista pivot survives (replace is scoped to tenant 1).
+        $this->assertDatabaseHas('user_role', [
+            'user_id' => $maria->id,
+            'tenant_id' => $this->tenant->id,
+            'role_id' => $this->roleId('staff'),
+        ]);
+        $this->assertDatabaseMissing('user_role', [
+            'user_id' => $maria->id,
+            'tenant_id' => $this->tenant->id,
+            'role_id' => $this->roleId('admin_local'),
+        ]);
+        $this->assertDatabaseHas('user_role', [
+            'user_id' => $maria->id,
+            'tenant_id' => $otherTenant->id,
+            'role_id' => $this->roleId('recepcionista'),
+        ]);
+    }
+
+    // ── S-15: junk protection — nothing created/modified, count stays 10 ──
+
+    public function test_seeder_leaves_junk_accounts_untouched(): void
+    {
+        $providers = $this->createRealKinesilkProviders();
+        $mariaProvider = $providers['maria@kinesilk.cl'];
+
+        // Duplicate factory user on provider 1: different email, same provider.
+        $junkDup = User::factory()->create([
+            'role' => UserRole::PROVIDER,
+            'email' => 'royce.langosh@example.org',
+            'provider_id' => $mariaProvider->id,
+            'tenant_id' => null,
+        ]);
+
+        // Junk provider 11 with a linked user whose email does NOT match the
+        // provider email (email-keyed real-user rule fails).
+        $junkProvider11 = $this->makeProvider([
+            'first_name' => 'P', 'last_name' => 'A', 'email' => 'pa@t.com',
+        ]);
+        $junkUser11 = User::factory()->create([
+            'role' => UserRole::PROVIDER,
+            'email' => 'maggio.talon@example.net',
+            'provider_id' => $junkProvider11->id,
+            'tenant_id' => null,
+        ]);
+
+        // Junk provider 12 with no linked user at all.
+        $this->makeProvider(['first_name' => 'P', 'last_name' => 'B', 'email' => 'pb@t.com']);
+
+        $usersBefore = User::count();
+        $providersBefore = Provider::count();
+
+        $this->artisan('db:seed', ['--class' => ProviderCalendarRoleSeeder::class])
+            ->assertSuccessful();
+
+        // Still exactly the 10 real assignments under tenant 1 (S-15).
+        $this->assertDatabaseCount('user_role', 10);
+        $this->assertSame(10, DB::table('user_role')->where('tenant_id', $this->tenant->id)->count());
+
+        // No pivot rows for any junk account.
+        $this->assertDatabaseMissing('user_role', ['user_id' => $junkDup->id]);
+        $this->assertDatabaseMissing('user_role', ['user_id' => $junkUser11->id]);
+
+        // The real maria user (not the duplicate) holds the staff row.
+        $mariaReal = User::where('provider_id', $mariaProvider->id)->where('email', 'maria@kinesilk.cl')->firstOrFail();
+        $this->assertDatabaseHas('user_role', [
+            'user_id' => $mariaReal->id,
+            'tenant_id' => $this->tenant->id,
+            'role_id' => $this->roleId('staff'),
+        ]);
+
+        // Nothing created or modified (no auto user/provider creation).
+        $this->assertSame($usersBefore, User::count());
+        $this->assertSame($providersBefore, Provider::count());
+    }
+
+    // ── T3 guard: RoleSeeder precondition — missing roles → error, no writes ──
+
+    public function test_seeder_reports_error_when_roles_are_missing(): void
+    {
+        $this->createRealKinesilkProviders();
+
+        // Simulate a DB where RoleSeeder has never run.
+        Role::query()->delete();
+
+        $this->artisan('db:seed', ['--class' => ProviderCalendarRoleSeeder::class])
+            ->expectsOutputToContain('RoleSeeder')
+            ->assertExitCode(0);
+
+        // No pivots may be written when the role precondition fails.
+        $this->assertDatabaseCount('user_role', 0);
     }
 
     // ── S-12: provider without a linked user → user: null, no error ──
