@@ -36,6 +36,7 @@ Route::middleware('throttle:api_public')->prefix('v1')->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login']);
     Route::patch('/auth/verify-email', [AuthController::class, 'verifyEmail']);
     Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+    Route::post('/auth/password', [AuthController::class, 'changePassword'])->middleware('auth:sanctum');
 });
 
 // Endpoints publicos — sin token
@@ -184,6 +185,7 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
     // Me — authenticated user's own profile (R10.1); no scope. The
     // client-scoped /me below is a different, untouched endpoint.
     Route::get('/auth/me', [AuthController::class, 'me']);
+    Route::patch('/auth/me', [AuthController::class, 'updateProfile']);
 
     // Me
     Route::get('/me', [ClientController::class, 'me'])->middleware('scope:clients:read');

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\ProviderStoreRequest;
 use App\Http\Requests\ProviderUpdateRequest;
 use App\Http\Requests\V1\AssignProviderRolesRequest;
+use App\Http\Requests\V1\ProviderIndexRequest;
 use App\Http\Resources\V1\ProviderResource;
 use App\Models\Provider;
 use App\Models\Role;
@@ -18,10 +19,52 @@ use Illuminate\Support\Str;
 
 class ProviderController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    /**
+     * GET /api/v1/providers — global list (BR22) with an optional `roles[]`
+     * attendance filter scoped to the caller's tenant (REQ-1..REQ-3).
+     *
+     * When a non-empty roles set is applied, only providers whose linked
+     * user holds at least one requested slug on a user_role pivot whose
+     * tenant_id equals the caller's tenant are returned (provider-level
+     * whereHas → no duplicated rows, composes with active/location/service).
+     * A tenantless caller sending a non-empty roles set gets 409
+     * onboarding_required (BR18 parity); empty/absent roles leave the
+     * unfiltered global list unchanged.
+     */
+    public function index(ProviderIndexRequest $request): JsonResponse
     {
+        /** @var User $user */
+        $user = $request->user();
+        $tenantId = $user->tenant_id;
+
+        // An explicitly empty roles array (e.g. `{"roles":[]}`) validates to []
+        // and MUST behave as if the filter were absent (REQ-1/S-5), so the
+        // trigger is a NON-EMPTY set — Laravel's filled() treats [] as filled.
+        $roles = $request->validated('roles') ?? [];
+        $hasRoleFilter = $roles !== [];
+
+        if ($hasRoleFilter && $tenantId === null) {
+            return response()->json([
+                'error' => 'onboarding_required',
+                'detail' => 'Debes completar la creación de tu negocio antes de filtrar profesionales por rol.',
+            ], 409);
+        }
+
         $providers = Provider::query()
-            ->with(['location', 'services'])
+            ->with([
+                'location',
+                'services',
+                // N+1-free nested roles, scoped to the caller tenant so
+                // foreign-tenant pivot rows never leak (REQ-5/S-10).
+                'user.roles' => fn ($q) => $q
+                    ->wherePivot('tenant_id', $tenantId)
+                    ->orderBy('roles.id'),
+            ])
+            ->when($hasRoleFilter, fn ($q) => $q->whereHas(
+                'user.roles',
+                fn ($q) => $q->whereIn('roles.slug', $roles)
+                    ->where('user_role.tenant_id', $tenantId)
+            ))
             ->when($request->location_id, fn ($q) => $q->where('location_id', $request->location_id)
             )
             ->when($request->service_id, function ($q) use ($request) {
@@ -38,9 +81,18 @@ class ProviderController extends Controller
         return response()->json(ProviderResource::collection($providers));
     }
 
-    public function show(int $id): JsonResponse
+    public function show(Request $request, int $id): JsonResponse
     {
-        $provider = Provider::with(['location', 'services'])->findOrFail($id);
+        /** @var User $user */
+        $user = $request->user();
+
+        $provider = Provider::with([
+            'location',
+            'services',
+            'user.roles' => fn ($q) => $q
+                ->wherePivot('tenant_id', $user->tenant_id)
+                ->orderBy('roles.id'),
+        ])->findOrFail($id);
 
         return response()->json(['data' => new ProviderResource($provider)]);
     }
