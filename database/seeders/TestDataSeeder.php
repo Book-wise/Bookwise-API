@@ -78,13 +78,14 @@ class TestDataSeeder extends Seeder
         ]);
 
         // ── Booking statuses — IDs fijos para coincidir con el front ──
-        $upsert('booking_statuses', ['id' => 1], ['name' => 'Reservado', 'color' => '#93c5fd', 'is_cancellation' => false]);
-        $upsert('booking_statuses', ['id' => 2], ['name' => 'Confirmado', 'color' => '#fb923c', 'is_cancellation' => false]);
-        $upsert('booking_statuses', ['id' => 3], ['name' => 'Asiste', 'color' => '#ec4899', 'is_cancellation' => false]);
-        $upsert('booking_statuses', ['id' => 4], ['name' => 'No asistio', 'color' => '#f9a8d4', 'is_cancellation' => false]);
-        $upsert('booking_statuses', ['id' => 5], ['name' => 'Pendiente', 'color' => '#fca5a5', 'is_cancellation' => false]);
-        $upsert('booking_statuses', ['id' => 6], ['name' => 'En espera', 'color' => '#86efac', 'is_cancellation' => false]);
-        $upsert('booking_statuses', ['id' => 7], ['name' => 'Cancelada', 'color' => '#d1d5db', 'is_cancellation' => true]);
+        // is_finalized: false para estados vivos (1,2,5,6), true para terminales (3,4,7).
+        $upsert('booking_statuses', ['id' => 1], ['name' => 'Reservado', 'color' => '#93c5fd', 'is_cancellation' => false, 'is_finalized' => false]);
+        $upsert('booking_statuses', ['id' => 2], ['name' => 'Confirmado', 'color' => '#fb923c', 'is_cancellation' => false, 'is_finalized' => false]);
+        $upsert('booking_statuses', ['id' => 3], ['name' => 'Asiste', 'color' => '#ec4899', 'is_cancellation' => false, 'is_finalized' => true]);
+        $upsert('booking_statuses', ['id' => 4], ['name' => 'No asistio', 'color' => '#f9a8d4', 'is_cancellation' => false, 'is_finalized' => true]);
+        $upsert('booking_statuses', ['id' => 5], ['name' => 'Pendiente', 'color' => '#fca5a5', 'is_cancellation' => false, 'is_finalized' => false]);
+        $upsert('booking_statuses', ['id' => 6], ['name' => 'En espera', 'color' => '#86efac', 'is_cancellation' => false, 'is_finalized' => false]);
+        $upsert('booking_statuses', ['id' => 7], ['name' => 'Cancelada', 'color' => '#d1d5db', 'is_cancellation' => true, 'is_finalized' => true]);
 
         // ── Clients ───────────────────────────────────────────────────
         $c = [];
