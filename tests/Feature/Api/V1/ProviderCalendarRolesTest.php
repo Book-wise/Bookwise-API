@@ -274,8 +274,16 @@ class ProviderCalendarRolesTest extends TestCase
         // Ordered by first_name, global (Alma before Zoe).
         $this->assertSame('Alma', $providers[0]['first_name']);
         $this->assertSame('Zoe', $providers[1]['first_name']);
-        // Roles must never be flattened to the top level (BR-C10).
-        $response->assertJsonMissingPath('0.roles');
+        // Top-level `roles` is now exposed (frontend Role model contract), while
+        // the nested `user.roles` remains. Alma holds staff under the caller
+        // tenant; Zoe (no linked user) surfaces an empty top-level set.
+        $response->assertJsonPath('0.roles', [
+            ['id' => $this->roleId('staff'), 'slug' => 'staff', 'name' => 'Staff'],
+        ]);
+        $this->assertSame([], $providers[1]['roles']);
+        $response->assertJsonPath('0.user.roles', [
+            ['slug' => 'staff', 'name' => 'Staff'],
+        ]);
     }
 
     // ── S-7: tenantless caller + roles filter → 409 onboarding_required ──

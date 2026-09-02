@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\BusinessRole;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ProviderStoreRequest;
@@ -134,7 +135,15 @@ class ProviderController extends Controller
 
     public function store(ProviderStoreRequest $request): JsonResponse
     {
+        /** @var User $admin */
+        $admin = $request->user();
+
         $provider = Provider::create($request->validated());
+
+        // Default business role for a new professional is `staff` so they can be
+        // selected for bookings. This is a sensible default only — the admin can
+        // change it later via PATCH /providers/{id}/roles (never a locked rule).
+        $this->assignDefaultStaffRole($provider, $admin);
 
         $provider->load(['location', 'services']);
 
@@ -233,21 +242,12 @@ class ProviderController extends Controller
         }
 
         $data = DB::transaction(function () use ($provider, $request, $admin): array {
-            $user = $provider->user;
+            $user = $this->ensureUser($provider, $admin);
 
-            if (! $user) {
-                $user = User::create([
-                    'name' => trim($provider->first_name.' '.$provider->last_name),
-                    'email' => $provider->email,
-                    'password' => Str::password(32),
-                    'role' => UserRole::PROVIDER,
-                    'provider_id' => $provider->id,
-                    'tenant_id' => $admin->tenant_id,
-                ]);
-
-                // Admin-approved creation — otherwise the login gate would
-                // strand the professional with no verification path (BR19).
-                $user->forceFill(['email_verified_at' => now()])->save();
+            // Cannot be null here: the email-collision branch above already
+            // returned 409, and a provider without a user gets one created.
+            if ($user === null) {
+                throw new \RuntimeException('Expected a provider user after preflight.');
             }
 
             $roleIds = Role::query()->whereIn('slug', $request->validated('roles'))->pluck('id');
@@ -276,5 +276,89 @@ class ProviderController extends Controller
                 ])->values(),
             ],
         ], 200);
+    }
+
+    /**
+     * Ensure the provider has a linked User, creating one (technical role
+     * provider, verified on creation) when missing. Shared by store() and
+     * assignRoles() so the user-creation logic stays DRY (S-24).
+     *
+     * @return User|null the linked/created user, or null when the provider email
+     *                   is already owned by another account (never created/merged)
+     */
+    private function ensureUser(Provider $provider, User $admin): ?User
+    {
+        // Prefer the loaded relation (assignRoles eager-loads it so it is never
+        // marked here); otherwise resolve by provider_id. This avoids triggering
+        // a lazy load that would mark `user` as loaded on a freshly created
+        // provider in store() and leak `user: null` into the create response.
+        $existing = $provider->relationLoaded('user')
+            ? $provider->user
+            : User::query()->where('provider_id', $provider->id)->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        // The provider email is already owned by another account — never create a
+        // duplicate or steal the account (assignRoles 409s; store skips the default).
+        if (User::query()->where('email', $provider->email)->exists()) {
+            return null;
+        }
+
+        $user = User::create([
+            'name' => trim($provider->first_name.' '.$provider->last_name),
+            'email' => $provider->email,
+            'password' => Str::password(32),
+            'role' => UserRole::PROVIDER,
+            'provider_id' => $provider->id,
+            'tenant_id' => $admin->tenant_id,
+        ]);
+
+        // Admin-approved creation — otherwise the login gate would strand the
+        // professional with no verification path (BR19).
+        $user->forceFill(['email_verified_at' => now()])->save();
+
+        return $user;
+    }
+
+    /**
+     * Apply the default `staff` business role to a freshly created provider,
+     * scoped to the admin's tenant. Editable afterward via PATCH /providers/{id}/roles.
+     */
+    private function assignDefaultStaffRole(Provider $provider, User $admin): void
+    {
+        // No tenant context → cannot scope a business role. The provider is still
+        // created and roles are assigned later via PATCH /providers/{id}/roles.
+        if ($admin->tenant_id === null) {
+            return;
+        }
+
+        DB::transaction(function () use ($provider, $admin): void {
+            $user = $this->ensureUser($provider, $admin);
+
+            // Email already owned elsewhere → leave role resolution to assignRoles()
+            // (which returns 409 email_collision). Provider creation is unaffected.
+            if ($user === null) {
+                return;
+            }
+
+            $staff = Role::query()->where('slug', BusinessRole::STAFF->value)->first();
+
+            // RoleSeeder may not have run in some environments — skip silently
+            // rather than fail provider creation.
+            if ($staff === null) {
+                return;
+            }
+
+            // Only apply the default where the professional holds no business role
+            // under this tenant yet, so an existing role set is never disturbed and
+            // the user_role unique triple is never violated.
+            $hasRole = $user->roles()->wherePivot('tenant_id', $admin->tenant_id)->exists();
+
+            if (! $hasRole) {
+                $user->roles()->attach($staff->id, ['tenant_id' => $admin->tenant_id]);
+            }
+        });
     }
 }
