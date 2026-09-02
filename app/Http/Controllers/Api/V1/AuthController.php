@@ -4,13 +4,17 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\UserRole;
 use App\Events\UserRegistered;
+use App\Events\UserRequestedPasswordReset;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\V1\ForgotPasswordRequest;
 use App\Http\Requests\V1\PasswordChangeRequest;
 use App\Http\Requests\V1\ProfileUpdateRequest;
 use App\Http\Requests\V1\RegisterRequest;
+use App\Http\Requests\V1\ResetPasswordRequest;
 use App\Http\Requests\V1\VerifyEmailRequest;
 use App\Http\Resources\UserResource;
 use App\Models\EmailVerificationToken;
+use App\Models\PasswordResetToken;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -49,6 +53,108 @@ class AuthController extends Controller
             'message' => 'Tu cuenta fue creada. Revisa tu correo para verificar tu email.',
             'user' => new UserResource($user),
         ], 201);
+    }
+
+    /**
+     * Forgot password (REQ-3): mint a single-use 60-minute reset token for an
+     * existing user and hand it to the queued email push. The response is the
+     * byte-identical 200 for unknown emails (no enumeration), and unknown
+     * emails produce no write and no event.
+     */
+    public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
+    {
+        $user = User::where('email', $request->validated('email'))->first();
+
+        if ($user !== null) {
+            $plainToken = Str::random(64);
+            $expiresAt = now()->addMinutes(PasswordResetToken::EXPIRES_IN_MINUTES);
+
+            // Last-wins overwrite (REQ-2): the email PK keeps exactly one row,
+            // so a repeated forgot atomically replaces hash/expiry and clears
+            // any previous usage, superseding earlier links.
+            $token = PasswordResetToken::updateOrCreate(
+                ['email' => $user->email],
+                [
+                    'token' => hash('sha256', $plainToken),
+                    'expires_at' => $expiresAt,
+                    'used_at' => null,
+                ]
+            );
+
+            event(new UserRequestedPasswordReset($user, $plainToken, $token));
+        }
+
+        return response()->json([
+            'message' => 'Si el email existe, recibirás un link para restablecer tu contraseña.',
+        ]);
+    }
+
+    /**
+     * Reset password (REQ-4): consume a single-use 60-minute reset token under
+     * a locked transaction and swap the credentials.
+     *
+     * All state checks happen inside a DB::transaction with the row re-read by
+     * email PK under lockForUpdate (verify-email pattern), in strict order:
+     * missing row or hash mismatch → invalid_token; past expiry → token_expired;
+     * consumed row → token_already_used. On success the token is marked used,
+     * the password is persisted through the `hashed` cast, and EVERY Sanctum
+     * token of the user is revoked (D3: reset is unauthenticated proof-of-email
+     * only, the account may be compromised). No auto-login: the 200 body is the
+     * fixed message only.
+     */
+    public function resetPassword(ResetPasswordRequest $request): JsonResponse
+    {
+        $hash = hash('sha256', $request->validated('token'));
+
+        $error = DB::transaction(function () use ($request, $hash): ?string {
+            $reset = PasswordResetToken::query()
+                ->where('email', $request->validated('email'))
+                ->lockForUpdate()
+                ->first();
+
+            if (! $reset) {
+                return 'invalid_token';
+            }
+
+            if (! hash_equals($reset->token, $hash)) {
+                return 'invalid_token';
+            }
+
+            if ($reset->expires_at->isPast()) {
+                return 'token_expired';
+            }
+
+            if ($reset->used_at !== null) {
+                return 'token_already_used';
+            }
+
+            // The token row carries no FK (email is identity, REQ-1): a row can
+            // outlive its user. Defensive — never reset a nonexistent account.
+            $user = User::where('email', $reset->email)->first();
+
+            if (! $user) {
+                return 'invalid_token';
+            }
+
+            // Consume the token and swap credentials atomically.
+            $reset->forceFill(['used_at' => now()])->save();
+            $user->password = $request->validated('password'); // cast 'hashed'
+            $user->save();
+
+            // Revoke every active session (D3/MD2) — unlike the authenticated
+            // changePassword, which deliberately keeps its own session.
+            $user->tokens()->delete();
+
+            return null;
+        });
+
+        if ($error !== null) {
+            return response()->json(['error' => $error], 400);
+        }
+
+        return response()->json([
+            'message' => 'Tu contraseña fue restablecida correctamente. Ya puedes iniciar sesión.',
+        ]);
     }
 
     /**
