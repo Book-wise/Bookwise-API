@@ -6,7 +6,9 @@ use App\Events\BookingCancelled;
 use App\Events\BookingConfirmed;
 use App\Events\BookingCreated;
 use App\Events\UserRegistered;
+use App\Events\UserRequestedPasswordReset;
 use App\Jobs\PushNotificationToCarlitox;
+use App\Jobs\PushPasswordResetEmailToCarlitox;
 use App\Jobs\PushVerificationEmailToCarlitox;
 use App\Models\Booking;
 
@@ -17,6 +19,15 @@ class NotifyCarlitoxListener
         PushVerificationEmailToCarlitox::dispatch(
             $event->user,
             $event->verification,
+            $event->plainToken,
+        );
+    }
+
+    public function handleUserRequestedPasswordReset(UserRequestedPasswordReset $event): void
+    {
+        PushPasswordResetEmailToCarlitox::dispatch(
+            $event->user,
+            $event->token,
             $event->plainToken,
         );
     }
