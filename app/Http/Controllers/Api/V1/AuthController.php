@@ -4,13 +4,16 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\UserRole;
 use App\Events\UserRegistered;
+use App\Events\UserRequestedPasswordReset;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\V1\ForgotPasswordRequest;
 use App\Http\Requests\V1\PasswordChangeRequest;
 use App\Http\Requests\V1\ProfileUpdateRequest;
 use App\Http\Requests\V1\RegisterRequest;
 use App\Http\Requests\V1\VerifyEmailRequest;
 use App\Http\Resources\UserResource;
 use App\Models\EmailVerificationToken;
+use App\Models\PasswordResetToken;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -49,6 +52,40 @@ class AuthController extends Controller
             'message' => 'Tu cuenta fue creada. Revisa tu correo para verificar tu email.',
             'user' => new UserResource($user),
         ], 201);
+    }
+
+    /**
+     * Forgot password (REQ-3): mint a single-use 60-minute reset token for an
+     * existing user and hand it to the queued email push. The response is the
+     * byte-identical 200 for unknown emails (no enumeration), and unknown
+     * emails produce no write and no event.
+     */
+    public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
+    {
+        $user = User::where('email', $request->validated('email'))->first();
+
+        if ($user !== null) {
+            $plainToken = Str::random(64);
+            $expiresAt = now()->addMinutes(PasswordResetToken::EXPIRES_IN_MINUTES);
+
+            // Last-wins overwrite (REQ-2): the email PK keeps exactly one row,
+            // so a repeated forgot atomically replaces hash/expiry and clears
+            // any previous usage, superseding earlier links.
+            $token = PasswordResetToken::updateOrCreate(
+                ['email' => $user->email],
+                [
+                    'token' => hash('sha256', $plainToken),
+                    'expires_at' => $expiresAt,
+                    'used_at' => null,
+                ]
+            );
+
+            event(new UserRequestedPasswordReset($user, $plainToken, $token));
+        }
+
+        return response()->json([
+            'message' => 'Si el email existe, recibirás un link para restablecer tu contraseña.',
+        ]);
     }
 
     /**
