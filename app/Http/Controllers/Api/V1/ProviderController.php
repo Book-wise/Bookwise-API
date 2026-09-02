@@ -12,6 +12,7 @@ use App\Http\Resources\V1\ProviderResource;
 use App\Models\Provider;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\ProviderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -109,18 +110,53 @@ class ProviderController extends Controller
         ], 201);
     }
 
-    public function update(ProviderUpdateRequest $request, int $id): JsonResponse
+    public function update(ProviderUpdateRequest $request, int $id, ProviderService $providerService): JsonResponse
     {
         $provider = Provider::findOrFail($id);
+
+        // Detect if the request is trying to deactivate the provider. Providers
+        // never support a forced bypass: a stray `force` key is ignored because
+        // ProviderUpdateRequest has no such rule and validated() drops it.
+        $isTryingToDeactivate = $request->has('active')
+            && $provider->active
+            && ! filter_var($request->input('active'), FILTER_VALIDATE_BOOLEAN);
+
+        $isActivating = $request->has('active')
+            && ! $provider->active
+            && filter_var($request->input('active'), FILTER_VALIDATE_BOOLEAN);
+
+        // Run preflight check when deactivating
+        if ($isTryingToDeactivate) {
+            $preflight = $providerService->checkDeactivationPreflight($provider->id);
+
+            if ($preflight['has_conflicts']) {
+                $bookingCount = count($preflight['bookings']);
+
+                return response()->json([
+                    'error' => 'deactivation_conflict',
+                    'message' => 'El profesional tiene '.$bookingCount.' reservas futuras por atender. Reubica o cancela sus reservas antes de desactivarlo.',
+                    'requires_confirmation' => true,
+                    'affects' => [
+                        'bookings' => $preflight['bookings'],
+                    ],
+                ], 409);
+            }
+        }
 
         $provider->update($request->validated());
 
         $provider->refresh();
         $provider->load(['location', 'services']);
 
+        $message = match (true) {
+            $isTryingToDeactivate => 'Profesional desactivado.',
+            $isActivating => 'Profesional activado.',
+            default => 'Profesional actualizado exitosamente',
+        };
+
         return response()->json([
             'data' => new ProviderResource($provider),
-            'message' => 'Profesional actualizado exitosamente',
+            'message' => $message,
         ], 200);
     }
 
