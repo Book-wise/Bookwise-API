@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\UserRole;
 use App\Events\UserRegistered;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\V1\PasswordChangeRequest;
+use App\Http\Requests\V1\ProfileUpdateRequest;
 use App\Http\Requests\V1\RegisterRequest;
 use App\Http\Requests\V1\VerifyEmailRequest;
 use App\Http\Resources\UserResource;
@@ -107,7 +109,9 @@ class AuthController extends Controller
             ]);
         }
 
-        $user = $request->user();
+        // Load tenant so UserResource exposes `business` (consistente con /auth/me).
+        // Sin esto, el login omitía `business` y el front creía que faltaba onboarding.
+        $user = $request->user()->load('tenant');
 
         // Verified-email gate (BR7/R8.1): no token until the email is verified.
         if ($user->email_verified_at === null) {
@@ -139,10 +143,44 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Actualización de perfil (contrato con el front): solo phone es editable.
+     * email y name quedan read-only. Devuelve el user completo (con tenant
+     * cargado para exponer `business`) para que el front refresque sin re-peticionar.
+     */
+    public function updateProfile(ProfileUpdateRequest $request): JsonResponse
+    {
+        $user = $request->user();
+        $user->phone = $request->validated('phone');
+        $user->save();
+
+        return response()->json([
+            'user' => new UserResource($user->load('tenant')),
+        ]);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Logged out successfully.']);
+    }
+
+    /**
+     * Cambio de contraseña del usuario autenticado (desde Perfil).
+     *
+     * Toda la validación de reglas y de la contraseña actual vive en
+     * PasswordChangeRequest. No se revoca el token actual: la sesión sigue
+     * válida tras el cambio (contrato con el front).
+     */
+    public function changePassword(PasswordChangeRequest $request): JsonResponse
+    {
+        $user = $request->user();
+        $user->password = $request->validated('password'); // cast 'hashed'
+        $user->save();
+
+        return response()->json([
+            'message' => 'Tu contraseña fue actualizada correctamente.',
+        ]);
     }
 }

@@ -4,6 +4,7 @@ namespace Tests\Feature\Api\V1;
 
 use App\Enums\UserRole;
 use App\Models\EmailVerificationToken;
+use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Str;
@@ -153,6 +154,34 @@ class EmailVerificationTest extends TestCase
         $response->assertStatus(200);
         $response->assertJson([
             'user' => ['email' => $user->email],
+        ]);
+        $this->assertNotNull($response->json('token'));
+        $this->assertDatabaseCount('personal_access_tokens', 1);
+    }
+
+    // ── S10b: Login de un verified user CON tenant expone `business` ──
+    // Regresión: login debía incluir `business` (como /auth/me) para que el
+    // front no creyera que falta completar el onboarding.
+
+    public function test_login_verified_user_with_tenant_exposes_business(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $user = User::factory()->create([
+            'role' => UserRole::ADMIN,
+            'email_verified_at' => now(),
+            'tenant_id' => $tenant->id,
+        ]);
+
+        $response = $this->postJson('/api/v1/auth/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('user.tenant_id', $tenant->id);
+        $response->assertJsonPath('user.onboarding_complete', true);
+        $response->assertJsonStructure([
+            'user' => ['business' => ['id', 'name']],
         ]);
         $this->assertNotNull($response->json('token'));
         $this->assertDatabaseCount('personal_access_tokens', 1);
