@@ -115,6 +115,45 @@ class LogoService
         }
     }
 
+    /**
+     * Devuelve el logo del negocio como data URI (base64) para incrustarlo en
+     * el PDF y en el correo, sin depender de que la URL sea alcanzable por el
+     * cliente. `null` si no hay logo o no se puede leer.
+     */
+    public function dataUri(?Tenant $tenant): ?string
+    {
+        if (! $tenant?->business_logo_url) {
+            return null;
+        }
+
+        $path = parse_url($tenant->business_logo_url, PHP_URL_PATH);
+
+        if ($path === false || $path === null || $path === '') {
+            return null;
+        }
+
+        // Soporta URLs con /storage/ y rutas relativas al disco público.
+        $relative = $this->relativePath($tenant->business_logo_url) ?? ltrim($path, '/');
+
+        $disk = Storage::disk('public');
+
+        if ($disk->exists($relative)) {
+            $abs = $disk->path($relative);
+        } elseif (is_file($relative)) {
+            $abs = $relative;
+        } else {
+            return null;
+        }
+
+        if (! is_file($abs)) {
+            return null;
+        }
+
+        $mime = function_exists('mime_content_type') ? mime_content_type($abs) : 'image/png';
+
+        return 'data:'.($mime ?: 'image/png').';base64,'.base64_encode(file_get_contents($abs));
+    }
+
     private function relativePath(string $url): ?string
     {
         $path = parse_url($url, PHP_URL_PATH);

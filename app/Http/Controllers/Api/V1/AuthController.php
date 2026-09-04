@@ -250,6 +250,30 @@ class AuthController extends Controller
     }
 
     /**
+     * Cambia el negocio activo del usuario (multi-tenant). Solo admin (org) puede
+     * alternar; el provider queda atado a su tenant. Devuelve el user actualizado.
+     */
+    public function switchTenant(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'tenant_id' => ['required', 'integer', 'exists:tenants,id'],
+        ]);
+
+        $user = $request->user();
+
+        if (! $user->isAdminGeneral()) {
+            abort(403, 'Solo el admin general puede cambiar de negocio.');
+        }
+
+        $user->tenant_id = $validated['tenant_id'];
+        $user->save();
+
+        return response()->json([
+            'user' => new UserResource($user->load('tenant')),
+        ]);
+    }
+
+    /**
      * Actualización de perfil (contrato con el front): solo phone es editable.
      * email y name quedan read-only. Devuelve el user completo (con tenant
      * cargado para exponer `business`) para que el front refresque sin re-peticionar.

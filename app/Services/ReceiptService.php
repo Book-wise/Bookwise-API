@@ -8,6 +8,10 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class ReceiptService
 {
+    public function __construct(
+        private readonly LogoService $logos,
+    ) {}
+
     /**
      * Generate a PDF receipt for the given sale and tenant.
      *
@@ -20,6 +24,7 @@ class ReceiptService
         $pdf = Pdf::loadView('receipts.sale', [
             'sale' => $sale,
             'tenant' => $tenant,
+            'logoData' => $this->logos->dataUri($tenant),
         ]);
 
         return $pdf->output();

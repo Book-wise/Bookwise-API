@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Mail\PasswordResetEmail;
 use App\Models\PasswordResetToken;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
@@ -10,17 +11,15 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use RuntimeException;
 
-class PushPasswordResetEmailToCarlitox implements ShouldBeUnique, ShouldQueue
+class SendPasswordResetEmail implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public const EVENT_USER_RESET_PASSWORD = 'user.reset_password';
-
-    public const CHANNEL_EMAIL = 'email';
 
     /**
      * Maximum number of retry attempts before marking as failed.
@@ -37,8 +36,8 @@ class PushPasswordResetEmailToCarlitox implements ShouldBeUnique, ShouldQueue
 
     /**
      * Execute the job — re-gate the reset token against a FRESH row at run
-     * time (a stale queued link must never push), then deliver the reset link
-     * (plain token) to carlitox for email delivery.
+     * time (a stale queued link must never send), then deliver the reset link
+     * (plain token) via Mailgun.
      */
     public function handle(): void
     {
@@ -52,23 +51,19 @@ class PushPasswordResetEmailToCarlitox implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $webhookUrl = config('services.carlitox.webhook_url');
-
-        if (blank($webhookUrl)) {
-            throw new RuntimeException('carlitox webhook_url is not configured');
-        }
-
         $frontendUrl = config('services.frontend.url');
 
         if (blank($frontendUrl)) {
             throw new RuntimeException('frontend url is not configured');
         }
 
-        $response = Http::timeout(10)
-            ->connectTimeout(5)
-            ->post($webhookUrl, $this->payload($frontendUrl, $fresh));
+        $resetUrl = rtrim($frontendUrl, '/')
+            .'/reset-password?token='.$this->plainToken
+            .'&email='.rawurlencode($this->user->email);
 
-        $response->throw();
+        Mail::mailer('mailgun')
+            ->to($this->user->email, $this->user->name)
+            ->send(new PasswordResetEmail($this->user, $resetUrl));
     }
 
     /**
@@ -82,7 +77,7 @@ class PushPasswordResetEmailToCarlitox implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * Get the unique identifier for the job, preventing duplicate pushes.
+     * Get the unique identifier for the job, preventing duplicate sends.
      */
     public function uniqueId(): string
     {
@@ -99,47 +94,14 @@ class PushPasswordResetEmailToCarlitox implements ShouldBeUnique, ShouldQueue
 
     /**
      * Handle a job failure — log user context only, NEVER the plain reset
-     * token or the payload (REQ-5).
+     * token (REQ-5).
      */
     public function failed(\Throwable $e): void
     {
-        Log::error('PushPasswordResetEmailToCarlitox failed', [
+        Log::error('SendPasswordResetEmail failed', [
             'user_id' => $this->user->id,
             'event' => self::EVENT_USER_RESET_PASSWORD,
             'error' => $e->getMessage(),
         ]);
-    }
-
-    /**
-     * Build the carlitox password-reset payload contract (REQ-5/D7).
-     *
-     * @return array{
-     *     event: string,
-     *     channel: string,
-     *     user: array{id: int, name: string, email: string},
-     *     reset: array{token: string, expires_at: string},
-     *     reset_url: string,
-     *     triggered_at: string
-     * }
-     */
-    private function payload(string $frontendUrl, PasswordResetToken $fresh): array
-    {
-        return [
-            'event' => self::EVENT_USER_RESET_PASSWORD,
-            'channel' => self::CHANNEL_EMAIL,
-            'user' => [
-                'id' => $this->user->id,
-                'name' => $this->user->name,
-                'email' => $this->user->email,
-            ],
-            'reset' => [
-                'token' => $this->plainToken,
-                'expires_at' => $fresh->expires_at->toIso8601String(),
-            ],
-            'reset_url' => rtrim($frontendUrl, '/')
-                .'/reset-password?token='.$this->plainToken
-                .'&email='.rawurlencode($this->user->email),
-            'triggered_at' => now()->toIso8601String(),
-        ];
     }
 }

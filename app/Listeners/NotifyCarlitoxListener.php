@@ -8,15 +8,15 @@ use App\Events\BookingCreated;
 use App\Events\UserRegistered;
 use App\Events\UserRequestedPasswordReset;
 use App\Jobs\PushNotificationToCarlitox;
-use App\Jobs\PushPasswordResetEmailToCarlitox;
-use App\Jobs\PushVerificationEmailToCarlitox;
+use App\Jobs\SendPasswordResetEmail;
+use App\Jobs\SendVerificationEmail;
 use App\Models\Booking;
 
 class NotifyCarlitoxListener
 {
     public function handleUserRegistered(UserRegistered $event): void
     {
-        PushVerificationEmailToCarlitox::dispatch(
+        SendVerificationEmail::dispatch(
             $event->user,
             $event->verification,
             $event->plainToken,
@@ -25,7 +25,7 @@ class NotifyCarlitoxListener
 
     public function handleUserRequestedPasswordReset(UserRequestedPasswordReset $event): void
     {
-        PushPasswordResetEmailToCarlitox::dispatch(
+        SendPasswordResetEmail::dispatch(
             $event->user,
             $event->token,
             $event->plainToken,

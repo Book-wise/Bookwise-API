@@ -48,6 +48,10 @@ class BookingController extends Controller
         $user = $request->user();
 
         $bookings = Booking::with(['client', 'service', 'provider', 'location', 'status', 'sale', 'packSession.clientPack'])
+            // Multi-tenant: solo reservas de profesionales del tenant del usuario.
+            ->when($user->tenant_id, function ($query) use ($user) {
+                $query->whereHas('provider.user', fn ($u) => $u->where('tenant_id', $user->tenant_id));
+            })
             // Provider filter: only show bookings for their locations
             ->when($user?->role?->value === 'provider', function ($query) use ($request) {
                 $locationIds = $request->attributes->get('provider_location_ids', []);

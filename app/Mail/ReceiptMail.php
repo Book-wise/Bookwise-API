@@ -3,6 +3,8 @@
 namespace App\Mail;
 
 use App\Models\Sale;
+use App\Models\Tenant;
+use App\Services\LogoService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Attachment;
@@ -20,8 +22,17 @@ class ReceiptMail extends Mailable
     public function __construct(
         public Sale $sale,
         public string $pdf,
+        public ?Tenant $tenant = null,
     ) {
         //
+    }
+
+    /**
+     * Logo del negocio como data URI (incrustado en el correo).
+     */
+    private function logoData(): ?string
+    {
+        return app(LogoService::class)->dataUri($this->tenant);
     }
 
     /**
@@ -29,8 +40,10 @@ class ReceiptMail extends Mailable
      */
     public function envelope(): Envelope
     {
+        $businessName = $this->tenant?->business_name ?? 'Kinesilk';
+
         return new Envelope(
-            subject: 'Comprobante de venta - Kinesilk',
+            subject: "Comprobante de venta - {$businessName}",
         );
     }
 
@@ -47,6 +60,9 @@ class ReceiptMail extends Mailable
                 'clientName' => $clientName,
                 'saleId' => $this->sale->id,
                 'total' => number_format((float) $this->sale->total, 0, ',', '.'),
+                'businessName' => $this->tenant?->business_name ?? 'Kinesilk',
+                'businessRut' => $this->tenant?->business_rut,
+                'logoData' => $this->logoData(),
             ],
         );
     }

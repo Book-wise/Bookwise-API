@@ -64,4 +64,22 @@ class User extends Authenticatable
     {
         return $this->email_verified_at !== null;
     }
+
+    /** ¿Tiene un rol de negocio por slug (admin_general, admin_local, staff...)? */
+    public function hasBusinessRole(string $slug): bool
+    {
+        return $this->roles()->where('roles.slug', $slug)->exists();
+    }
+
+    /** Admin general: gestiona TODOS los negocios del tenant/org. */
+    public function isAdminGeneral(): bool
+    {
+        return $this->hasBusinessRole('admin_general');
+    }
+
+    /** Admin local: solo su propio negocio/sucursal. */
+    public function isAdminLocal(): bool
+    {
+        return $this->hasBusinessRole('admin_local');
+    }
 }

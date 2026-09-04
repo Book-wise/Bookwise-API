@@ -2,7 +2,9 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\UserRole;
 use App\Http\Resources\V1\BusinessResource;
+use App\Models\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -22,6 +24,24 @@ class UserResource extends JsonResource
             // Onboarding is complete once the user owns a business (R10.2).
             'onboarding_complete' => $this->tenant_id !== null,
             'business' => new BusinessResource($this->whenLoaded('tenant')),
+            'businesses' => $this->businessesList(),
         ];
+    }
+
+    /**
+     * Negocios a los que el usuario puede alternar (para el selector multi-tenant).
+     * Admin general (rol de negocio) ve todos; admin local / provider / staff,
+     * solo el suyo.
+     */
+    private function businessesList(): array
+    {
+        if ($this->role !== UserRole::ADMIN || ! $this->isAdminGeneral()) {
+            return $this->tenant_id ? [new BusinessResource($this->tenant)] : [];
+        }
+
+        return Tenant::orderBy('business_name')
+            ->get()
+            ->map(fn ($tenant) => new BusinessResource($tenant))
+            ->all();
     }
 }

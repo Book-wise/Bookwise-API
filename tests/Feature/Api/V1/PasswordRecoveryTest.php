@@ -4,13 +4,12 @@ namespace Tests\Feature\Api\V1;
 
 use App\Enums\UserRole;
 use App\Events\UserRequestedPasswordReset;
-use App\Jobs\PushPasswordResetEmailToCarlitox;
+use App\Jobs\SendPasswordResetEmail;
 use App\Models\PasswordResetToken;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -40,7 +39,6 @@ class PasswordRecoveryTest extends TestCase
     public function test_forgot_existing_user_stores_hash_only_and_queues_reset_push(): void
     {
         Queue::fake();
-        Http::fake();
         config(['services.frontend.url' => 'https://front.test']);
 
         $user = $this->forgotUser();
@@ -52,7 +50,7 @@ class PasswordRecoveryTest extends TestCase
 
         $plainToken = null;
 
-        Queue::assertPushed(PushPasswordResetEmailToCarlitox::class, function ($job) use (&$plainToken, $user) {
+        Queue::assertPushed(SendPasswordResetEmail::class, function ($job) use (&$plainToken, $user) {
             $plainToken = $job->plainToken;
 
             return $job->user->is($user)
@@ -143,7 +141,6 @@ class PasswordRecoveryTest extends TestCase
     public function test_forgot_resubmission_overwrites_single_row_and_supersedes_previous_token(): void
     {
         Queue::fake();
-        Http::fake();
 
         $user = $this->forgotUser();
 
@@ -151,7 +148,7 @@ class PasswordRecoveryTest extends TestCase
 
         $firstPlain = null;
 
-        Queue::assertPushed(PushPasswordResetEmailToCarlitox::class, function ($job) use (&$firstPlain) {
+        Queue::assertPushed(SendPasswordResetEmail::class, function ($job) use (&$firstPlain) {
             $firstPlain = $job->plainToken;
 
             return true;
@@ -164,7 +161,7 @@ class PasswordRecoveryTest extends TestCase
         // so exactly one job is queued — but the row MUST hold a NEW hash.
         $this->postJson('/api/v1/auth/forgot-password', ['email' => $user->email])->assertStatus(200);
 
-        Queue::assertPushed(PushPasswordResetEmailToCarlitox::class, 1);
+        Queue::assertPushed(SendPasswordResetEmail::class, 1);
 
         // Exactly one row, and the previous plain token no longer matches it —
         // the first link is superseded by the overwrite.

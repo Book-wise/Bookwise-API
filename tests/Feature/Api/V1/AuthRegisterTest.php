@@ -3,11 +3,10 @@
 namespace Tests\Feature\Api\V1;
 
 use App\Enums\UserRole;
-use App\Jobs\PushVerificationEmailToCarlitox;
+use App\Jobs\SendVerificationEmail;
 use App\Models\EmailVerificationToken;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -122,7 +121,6 @@ class AuthRegisterTest extends TestCase
     public function test_register_stores_hashed_token_and_queues_verification_push(): void
     {
         Queue::fake();
-        Http::fake();
 
         $response = $this->postJson('/api/v1/auth/register', $this->validPayload());
 
@@ -132,7 +130,7 @@ class AuthRegisterTest extends TestCase
 
         $plainToken = null;
 
-        Queue::assertPushed(PushVerificationEmailToCarlitox::class, function ($job) use (&$plainToken, $user) {
+        Queue::assertPushed(SendVerificationEmail::class, function ($job) use (&$plainToken, $user) {
             $plainToken = $job->plainToken;
 
             return $job->user->is($user)

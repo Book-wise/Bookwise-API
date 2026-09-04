@@ -3,23 +3,21 @@
 namespace Tests\Feature\Api\V1;
 
 use App\Enums\UserRole;
-use App\Jobs\PushPasswordResetEmailToCarlitox;
+use App\Jobs\SendPasswordResetEmail;
+use App\Mail\PasswordResetEmail;
 use App\Models\PasswordResetToken;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
-use Illuminate\Http\Client\RequestException;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Mockery;
 use RuntimeException;
 use Tests\TestCase;
 
-class PushPasswordResetEmailToCarlitoxTest extends TestCase
+class SendPasswordResetEmailTest extends TestCase
 {
     use LazilyRefreshDatabase;
-
-    private const WEBHOOK_URL = 'https://carlitox.test/webhook';
 
     private const FRONTEND_URL = 'https://front.test';
 
@@ -33,7 +31,6 @@ class PushPasswordResetEmailToCarlitoxTest extends TestCase
     {
         parent::setUp();
 
-        config(['services.carlitox.webhook_url' => self::WEBHOOK_URL]);
         config(['services.frontend.url' => self::FRONTEND_URL]);
 
         // Deterministic email with characters that MUST be URL-encoded in the
@@ -52,75 +49,64 @@ class PushPasswordResetEmailToCarlitoxTest extends TestCase
         ]);
     }
 
-    private function makeJob(): PushPasswordResetEmailToCarlitox
+    private function makeJob(): SendPasswordResetEmail
     {
-        return new PushPasswordResetEmailToCarlitox(
+        return new SendPasswordResetEmail(
             user: $this->user,
             token: $this->token,
             plainToken: $this->plainToken,
         );
     }
 
-    // ── S-5.1: Payload contract ─────────────────────────────────────
+    // ── Mail delivery via Mailgun ───────────────────────────────────
 
-    public function test_posts_payload_contract_to_webhook_url(): void
+    public function test_sends_password_reset_email_via_mailgun(): void
     {
-        Http::fake(['*' => Http::response(['received' => true], 200)]);
-        Http::preventStrayRequests();
+        Mail::fake();
 
         $this->makeJob()->handle();
 
-        Http::assertSent(function ($request) {
-            return $request->url() === self::WEBHOOK_URL
-                && $request['event'] === PushPasswordResetEmailToCarlitox::EVENT_USER_RESET_PASSWORD
-                && $request['channel'] === PushPasswordResetEmailToCarlitox::CHANNEL_EMAIL
-                && $request['user']['id'] === $this->user->id
-                && $request['user']['name'] === $this->user->name
-                && $request['user']['email'] === $this->user->email
-                && $request['reset']['token'] === $this->plainToken
-                && $request['reset']['expires_at'] === $this->token->fresh()->expires_at->toIso8601String()
-                && $request['reset_url'] === self::FRONTEND_URL.'/reset-password?token='
-                    .$this->plainToken.'&email='.rawurlencode($this->user->email)
-                && preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/', $request['triggered_at']) === 1;
+        Mail::assertSent(PasswordResetEmail::class, function (PasswordResetEmail $mail) {
+            return $mail->hasTo($this->user->email)
+                && $mail->user->is($this->user)
+                && $mail->resetUrl === self::FRONTEND_URL.'/reset-password?token='
+                    .$this->plainToken.'&email='.rawurlencode($this->user->email);
         });
     }
 
     public function test_reset_url_is_built_from_frontend_url_without_duplicate_slashes(): void
     {
         config(['services.frontend.url' => 'https://front.test/']);
-        Http::fake(['*' => Http::response(['received' => true], 200)]);
-        Http::preventStrayRequests();
+        Mail::fake();
 
         $this->makeJob()->handle();
 
-        Http::assertSent(function ($request) {
-            return $request['reset_url'] === 'https://front.test/reset-password?token='
+        Mail::assertSent(PasswordResetEmail::class, function (PasswordResetEmail $mail) {
+            return $mail->resetUrl === 'https://front.test/reset-password?token='
                 .$this->plainToken.'&email='.rawurlencode($this->user->email);
         });
     }
 
-    // ── S-5.2: Runtime re-gate on the fresh row — silent skip ────────
+    // ── Runtime re-gate on the fresh row — silent skip ──────────────
 
-    public function test_skips_push_when_token_row_is_gone(): void
+    public function test_skips_send_when_token_row_is_gone(): void
     {
-        Http::fake();
-        Http::preventStrayRequests();
+        Mail::fake();
 
         $this->token->delete();
 
         $this->makeJob()->handle();
 
-        Http::assertNothingSent();
+        Mail::assertNothingSent();
     }
 
-    public function test_skips_push_when_token_was_superseded(): void
+    public function test_skips_send_when_token_was_superseded(): void
     {
-        Http::fake();
-        Http::preventStrayRequests();
+        Mail::fake();
 
         // Snapshot the job first (it carries the ORIGINAL mint), then a second
-        // forgot overwrites the row via updateOrCreate (last-wins, REQ-2) —
-        // separate instance, exactly like the production supersede path.
+        // forgot overwrites the row via updateOrCreate (last-wins) — separate
+        // instance, exactly like the production supersede path.
         $job = $this->makeJob();
 
         PasswordResetToken::updateOrCreate(
@@ -134,44 +120,32 @@ class PushPasswordResetEmailToCarlitoxTest extends TestCase
 
         $job->handle();
 
-        Http::assertNothingSent();
+        Mail::assertNothingSent();
     }
 
-    public function test_skips_push_when_token_was_used(): void
+    public function test_skips_send_when_token_was_used(): void
     {
-        Http::fake();
-        Http::preventStrayRequests();
+        Mail::fake();
 
         $this->token->update(['used_at' => now()]);
 
         $this->makeJob()->handle();
 
-        Http::assertNothingSent();
+        Mail::assertNothingSent();
     }
 
-    public function test_skips_push_when_token_expired(): void
+    public function test_skips_send_when_token_expired(): void
     {
-        Http::fake();
-        Http::preventStrayRequests();
+        Mail::fake();
 
         $this->token->update(['expires_at' => now()->subHour()]);
 
         $this->makeJob()->handle();
 
-        Http::assertNothingSent();
+        Mail::assertNothingSent();
     }
 
-    // ── S-5.3: Blank configuration throws loudly ────────────────────
-
-    public function test_blank_webhook_url_throws(): void
-    {
-        config(['services.carlitox.webhook_url' => null]);
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('carlitox webhook_url is not configured');
-
-        $this->makeJob()->handle();
-    }
+    // ── Blank configuration throws loudly ───────────────────────────
 
     public function test_blank_frontend_url_throws(): void
     {
@@ -183,7 +157,7 @@ class PushPasswordResetEmailToCarlitoxTest extends TestCase
         $this->makeJob()->handle();
     }
 
-    // ── S-5.4: failed() never logs the plain token ──────────────────
+    // ── failed() never logs the plain token ─────────────────────────
 
     public function test_failed_logs_context_without_token(): void
     {
@@ -193,9 +167,9 @@ class PushPasswordResetEmailToCarlitoxTest extends TestCase
 
         Log::shouldHaveReceived('error')
             ->once()
-            ->with('PushPasswordResetEmailToCarlitox failed', Mockery::on(function (array $context) {
+            ->with('SendPasswordResetEmail failed', Mockery::on(function (array $context) {
                 return $context['user_id'] === $this->user->id
-                    && $context['event'] === PushPasswordResetEmailToCarlitox::EVENT_USER_RESET_PASSWORD
+                    && $context['event'] === SendPasswordResetEmail::EVENT_USER_RESET_PASSWORD
                     && $context['error'] === 'boom'
                     && ! in_array($this->plainToken, $context, true)
                     && strpos(json_encode($context), $this->plainToken) === false;
@@ -219,16 +193,5 @@ class PushPasswordResetEmailToCarlitoxTest extends TestCase
         $this->assertSame('notifications', $job->queue);
         $this->assertSame(5, $job->tries);
         $this->assertSame([3, 10, 30, 60, 120], $job->backoff());
-    }
-
-    // ── Non-2xx throws (RequestException → retry path) ──────────────
-
-    public function test_non_2xx_response_throws(): void
-    {
-        Http::fake(['*' => Http::response('Server Error', 500)]);
-
-        $this->expectException(RequestException::class);
-
-        $this->makeJob()->handle();
     }
 }

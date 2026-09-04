@@ -5,10 +5,47 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <style>
         body { font-family: Arial, sans-serif; line-height: 1.5; color: #333; margin: 0; padding: 20px; }
-        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #059669; padding-bottom: 15px; }
-        .header img { max-width: 120px; max-height: 80px; margin-bottom: 8px; }
-        .header h1 { font-size: 20px; color: #059669; margin: 0; }
-        .header .rut { font-size: 12px; color: #6b7280; margin-top: 4px; }
+
+        /* ── Marca / avatar del negocio ─────────────────────────────────── */
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding-bottom: 16px;
+            margin-bottom: 18px;
+            border-bottom: 2px solid #059669;
+        }
+        .brand__avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 12px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+        .brand__avatar--empty {
+            width: 64px;
+            height: 64px;
+            border-radius: 12px;
+            background: #059669;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .brand__info { min-width: 0; }
+        .brand__name { font-size: 20px; font-weight: bold; color: #059669; margin: 0; line-height: 1.2; }
+        .brand__meta { font-size: 12px; color: #6b7280; margin-top: 4px; }
+        .brand__doc {
+            margin-left: auto;
+            text-align: right;
+            font-size: 12px;
+            color: #4b5563;
+        }
+        .brand__doc strong { color: #111; }
+
         .section { margin-bottom: 20px; }
         .section-title { font-size: 14px; font-weight: bold; color: #059669; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; margin-bottom: 10px; }
         table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -22,24 +59,37 @@
     </style>
 </head>
 <body>
-    {{-- Tenant Header (nullable-safe) --}}
-    <div class="header">
-        @if($tenant?->business_logo_url)
-            @php
-                $logoPath = $tenant->business_logo_url;
-                $isAbsolute = str_starts_with($logoPath, '/') || str_starts_with($logoPath, 'http');
-                $fullPath = $isAbsolute ? $logoPath : public_path('storage/' . ltrim($logoPath, '/'));
-            @endphp
-            @if(file_exists($fullPath))
-                <img src="file://{{ $fullPath }}" alt="Logo">
+    @php
+        // El logo ya viene resuelto como data URI desde ReceiptService/LogoService.
+        $monogram = $tenant?->business_name ? strtoupper(mb_substr($tenant->business_name, 0, 1)) : 'B';
+    @endphp
+
+    {{-- Marca / avatar del negocio --}}
+    <div class="brand">
+        @if($logoData)
+            <img class="brand__avatar" src="{{ $logoData }}" alt="Logo {{ $tenant?->business_name }}">
+        @else
+            <div class="brand__avatar--empty">{{ $monogram }}</div>
+        @endif
+
+        <div class="brand__info">
+            @if($tenant?->business_name)
+                <p class="brand__name">{{ $tenant->business_name }}</p>
             @endif
-        @endif
-        @if($tenant?->business_name)
-            <h1>{{ $tenant->business_name }}</h1>
-        @endif
-        @if($tenant?->business_rut)
-            <div class="rut">RUT: {{ $tenant->business_rut }}</div>
-        @endif
+            @if($tenant?->business_email)
+                <div class="brand__meta">{{ $tenant->business_email }}</div>
+            @endif
+            @if($tenant?->business_phone)
+                <div class="brand__meta">{{ $tenant->business_phone }}</div>
+            @endif
+        </div>
+
+        <div class="brand__doc">
+            @if($tenant?->business_rut)
+                <div>RUT: <strong>{{ $tenant->business_rut }}</strong></div>
+            @endif
+            <div>Comprobante de venta</div>
+        </div>
     </div>
 
     {{-- Sale Info --}}
@@ -115,6 +165,9 @@
 
     <div class="footer">
         <p>Comprobante de venta</p>
+        @if($tenant?->business_address)
+            <p>{{ $tenant->business_address }}</p>
+        @endif
     </div>
 </body>
 </html>

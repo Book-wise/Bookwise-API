@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\BusinessRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V1\StoreBusinessRequest;
+use App\Http\Requests\V1\UpdateBusinessRequest;
 use App\Http\Resources\V1\BusinessResource;
 use App\Models\Role;
 use App\Models\Tenant;
@@ -73,5 +74,35 @@ class BusinessController extends Controller
             'data' => new BusinessResource($tenant),
             'message' => 'Tu negocio fue creado correctamente.',
         ], 201);
+    }
+
+    /**
+     * PATCH /v1/businesses/{id} — edita la info del negocio (RUT inmutable).
+     * Solo admin_general (org) o el admin del propio negocio.
+     */
+    public function update(UpdateBusinessRequest $request, int $id): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $tenant = Tenant::findOrFail($id);
+
+        // Solo admin_general (org) o admin_local del propio negocio editan.
+        if (! $user->isAdminGeneral() && ! ($user->isAdminLocal() && $user->tenant_id === $tenant->id)) {
+            abort(403, 'No autorizado para editar este negocio.');
+        }
+
+        $data = $request->validated();
+
+        $tenant->update([
+            'business_name' => $data['name'],
+            'business_email' => $data['email'] ?? null,
+            'business_address' => $data['address'] ?? null,
+            'business_phone' => $data['phone'] ?? null,
+            'business_plan' => $data['plan'],
+        ]);
+
+        return response()->json([
+            'data' => new BusinessResource($tenant),
+        ]);
     }
 }

@@ -16,7 +16,14 @@ class LocationController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        // /locations es público (agente sin auth): si el caller envía token
+        // (frontend admin) se escopa por tenant_id (pertenencia dura); si no,
+        // devuelve todo (para el flujo público/agente).
+        $tenantId = auth('sanctum')->user()?->tenant_id;
+
         $locations = Location::with('region', 'comuna')
+            // Multi-tenant: solo sucursales del tenant (pertenencia dura).
+            ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
             ->when($request->active !== null, fn ($q) => $q->where('active', filter_var($request->active, FILTER_VALIDATE_BOOLEAN)))
             ->orderBy('name')
             ->paginate($request->per_page ?? 15);

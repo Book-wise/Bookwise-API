@@ -62,6 +62,11 @@ class ProviderController extends Controller
                     ->wherePivot('tenant_id', $tenantId)
                     ->orderBy('roles.id'),
             ])
+            // Multi-tenant: solo profesionales cuyo usuario pertenece al tenant.
+            ->when($tenantId, fn ($q) => $q->whereHas(
+                'user',
+                fn ($u) => $u->where('tenant_id', $tenantId)
+            ))
             ->when($hasRoleFilter, fn ($q) => $q->whereHas(
                 'user.roles',
                 fn ($q) => $q->whereIn('roles.slug', $roles)

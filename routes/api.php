@@ -45,19 +45,20 @@ Route::middleware('throttle:api_public')->prefix('v1')->group(function () {
 Route::middleware('throttle:api_public')->prefix('v1')->group(function () {
     Route::get('/config', [ConfigController::class, 'index']);
     Route::get('/available_slots', [AvailableSlotsController::class, 'index']);
-    Route::get('/services', [ServiceController::class, 'index']);
-    Route::get('/services/{id}', [ServiceController::class, 'show']);
-    Route::get('/locations', [LocationController::class, 'index']);
-    Route::get('/locations/{id}', [LocationController::class, 'show']);
     Route::get('/regions', [RegionController::class, 'index']);
     Route::get('/comunas', [RegionController::class, 'indexComunas']);
     Route::get('/regions/{id}/comunas', [RegionController::class, 'showComunas']);
-    Route::get('/packs', [ServicePackController::class, 'index']);
-    Route::get('/packs/{id}', [ServicePackController::class, 'show']);
 });
 
 // Endpoints autenticados — Bearer token + scopes
 Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(function () {
+    // Catálogo / sucursales (el agente usa rutas dedicadas; el front manda token).
+    Route::get('/services', [ServiceController::class, 'index']);
+    Route::get('/services/{id}', [ServiceController::class, 'show']);
+    Route::get('/locations', [LocationController::class, 'index']);
+    Route::get('/locations/{id}', [LocationController::class, 'show']);
+    Route::get('/packs', [ServicePackController::class, 'index']);
+    Route::get('/packs/{id}', [ServicePackController::class, 'show']);
 
     // Bookings - providers see only their location's bookings, admins see all
     Route::get('/bookings', [BookingController::class, 'index'])
@@ -176,6 +177,7 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
     // their own business profile (R9.1/R9.2)
     Route::get('/businesses', [BusinessController::class, 'index']);
     Route::post('/businesses', [BusinessController::class, 'store']);
+    Route::patch('/businesses/{id}', [BusinessController::class, 'update']);
 
     // Roles catalog — global business-role definitions, admin only, no
     // tenant required (R11.1); the assignment endpoint enforces onboarding
@@ -190,6 +192,7 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
     // client-scoped /me below is a different, untouched endpoint.
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::patch('/auth/me', [AuthController::class, 'updateProfile']);
+    Route::post('/auth/switch-tenant', [AuthController::class, 'switchTenant']);
 
     // Me
     Route::get('/me', [ClientController::class, 'me'])->middleware('scope:clients:read');
