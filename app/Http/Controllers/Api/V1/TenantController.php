@@ -68,6 +68,23 @@ class TenantController extends Controller
         return response()->json(['business_logo_url' => $url]);
     }
 
+    // ── DELETE /v1/tenant/settings/logo ─────────────────────────────
+    public function removeLogo(Request $request): JsonResponse
+    {
+        $tenant = auth()->user()->tenant;
+
+        if (! $tenant) {
+            return response()->json([
+                'error' => 'onboarding_required',
+                'detail' => 'Debes completar el onboarding de tu negocio antes de configurar el logo.',
+            ], 409);
+        }
+
+        $this->logoService->remove($tenant);
+
+        return response()->json(['business_logo_url' => null]);
+    }
+
     /**
      * @return array{business_name: ?string, business_rut: ?string, business_logo_url: ?string}
      */

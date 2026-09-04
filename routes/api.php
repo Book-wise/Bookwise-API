@@ -192,6 +192,8 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
     // client-scoped /me below is a different, untouched endpoint.
     Route::get('/auth/me', [AuthController::class, 'me']);
     Route::patch('/auth/me', [AuthController::class, 'updateProfile']);
+    Route::post('/auth/me/avatar', [AuthController::class, 'uploadAvatar']);
+    Route::delete('/auth/me/avatar', [AuthController::class, 'removeAvatar']);
     Route::post('/auth/switch-tenant', [AuthController::class, 'switchTenant']);
 
     // Me

@@ -2,31 +2,39 @@
 
 namespace App\Services;
 
-use App\Exceptions\LogoProcessingUnavailable;
-use App\Models\Tenant;
+use App\Exceptions\AvatarProcessingUnavailable;
+use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
 
-class LogoService
+class AvatarService
 {
     /**
      * Maximum size (in pixels) of the longest side of the generated thumbnail.
+     *
+     * Avatars render small in the UI (chip, list, profile hero) and are framed
+     * with object-fit: cover, so a compact thumbnail is enough and keeps the
+     * payload tiny.
      */
-    public const MAX_DIMENSION = 200;
+    public const MAX_DIMENSION = 128;
 
     /**
      * Generate an optimized thumbnail, store it on the public disk and replace
-     * any previous logo. Returns a PUBLIC-RELATIVE path (/storage/…) of the
+     * any previous avatar. Returns a PUBLIC-RELATIVE path (/storage/…) of the
      * new file.
      *
-     * Deliberately relative (not an absolute URL): the value must not be tied
-     * to the origin (APP_URL). The client resolves /storage/… against its own
-     * configured API base, so logos work across dev, prod, proxies and domain
-     * changes with a single client-side setting.
+     * We deliberately return a relative path, not an absolute URL: the stored
+     * value must not be tied to the origin that generated it (APP_URL). The
+     * client resolves /storage/… against its own configured API base, so the
+     * asset works across dev, prod, proxies and domain changes with a single
+     * client-side setting.
+     *
+     * The raw upload is never persisted: the file is resampled down to
+     * MAX_DIMENSION and re-encoded (WebP when available, JPEG otherwise).
      */
-    public function store(UploadedFile $file, ?Tenant $tenant): string
+    public function store(UploadedFile $file, User $user): string
     {
         $this->ensureGdAvailable();
 
@@ -43,7 +51,7 @@ class LogoService
 
         $thumb = imagecreatetruecolor($targetWidth, $targetHeight);
 
-        $format = function_exists('imagewebp') ? 'webp' : 'jpeg';
+        $format = $this->encoder();
 
         if ($format === 'jpeg') {
             $white = imagecolorallocate($thumb, 255, 255, 255);
@@ -67,7 +75,7 @@ class LogoService
         );
 
         $extension = $format === 'webp' ? 'webp' : 'jpg';
-        $filename = 'tenant-logos/'.Str::uuid().'.'.$extension;
+        $filename = 'user-avatars/'.Str::uuid().'.'.$extension;
 
         $disk = Storage::disk('public');
         $disk->makeDirectory(dirname($filename));
@@ -77,20 +85,20 @@ class LogoService
         imagedestroy($source);
         imagedestroy($thumb);
 
-        $this->deletePrior($tenant);
+        $this->deletePrior($user);
 
         return '/storage/'.$filename;
     }
 
     /**
-     * Elimina el logo del negocio (archivo + referencia). El frontend vuelve al
-     * fallback (monograma/iniciales). No-op si el negocio no tiene logo.
+     * Elimina el avatar del usuario (archivo + referencia). El frontend vuelve
+     * al fallback (iniciales/icono). No-op si el usuario no tiene avatar.
      */
-    public function remove(Tenant $tenant): void
+    public function remove(User $user): void
     {
-        $this->deletePrior($tenant);
-        $tenant->business_logo_url = null;
-        $tenant->save();
+        $this->deletePrior($user);
+        $user->avatar_url = null;
+        $user->save();
     }
 
     private function scaledDimensions(int $width, int $height): array
@@ -119,55 +127,26 @@ class LogoService
         imagejpeg($thumb, $path, $quality);
     }
 
-    private function deletePrior(?Tenant $tenant): void
+    private function deletePrior(User $user): void
     {
-        if (! $tenant?->business_logo_url) {
+        if (! $user->avatar_url) {
             return;
         }
 
-        $relative = $this->relativePath($tenant->business_logo_url);
+        $relative = $this->relativePath($user->avatar_url);
 
         if ($relative !== null && Storage::disk('public')->exists($relative)) {
-            Storage::disk('public')->delete($relative);        }
+            Storage::disk('public')->delete($relative);
+        }
     }
 
     /**
-     * Devuelve el logo del negocio como data URI (base64) para incrustarlo en
-     * el PDF y en el correo, sin depender de que la URL sea alcanzable por el
-     * cliente. `null` si no hay logo o no se puede leer.
+     * Prefer WebP when the GD build supports it (smaller, lossless alpha);
+     * fall back to JPEG otherwise.
      */
-    public function dataUri(?Tenant $tenant): ?string
+    private function encoder(): string
     {
-        if (! $tenant?->business_logo_url) {
-            return null;
-        }
-
-        $path = parse_url($tenant->business_logo_url, PHP_URL_PATH);
-
-        if ($path === false || $path === null || $path === '') {
-            return null;
-        }
-
-        // Soporta URLs con /storage/ y rutas relativas al disco público.
-        $relative = $this->relativePath($tenant->business_logo_url) ?? ltrim($path, '/');
-
-        $disk = Storage::disk('public');
-
-        if ($disk->exists($relative)) {
-            $abs = $disk->path($relative);
-        } elseif (is_file($relative)) {
-            $abs = $relative;
-        } else {
-            return null;
-        }
-
-        if (! is_file($abs)) {
-            return null;
-        }
-
-        $mime = function_exists('mime_content_type') ? mime_content_type($abs) : 'image/png';
-
-        return 'data:'.($mime ?: 'image/png').';base64,'.base64_encode(file_get_contents($abs));
+        return function_exists('imagewebp') ? 'webp' : 'jpeg';
     }
 
     private function relativePath(string $url): ?string
@@ -186,7 +165,7 @@ class LogoService
     private function ensureGdAvailable(): void
     {
         if (! extension_loaded('gd')) {
-            throw new LogoProcessingUnavailable('The GD extension is required to process logos.');
+            throw new AvatarProcessingUnavailable('The GD extension is required to process avatars.');
         }
     }
 }

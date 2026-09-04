@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\UserRole;
 use App\Events\UserRegistered;
 use App\Events\UserRequestedPasswordReset;
+use App\Exceptions\AvatarProcessingUnavailable;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\V1\AvatarUploadRequest;
 use App\Http\Requests\V1\ForgotPasswordRequest;
 use App\Http\Requests\V1\PasswordChangeRequest;
 use App\Http\Requests\V1\ProfileUpdateRequest;
@@ -16,6 +18,7 @@ use App\Http\Resources\UserResource;
 use App\Models\EmailVerificationToken;
 use App\Models\PasswordResetToken;
 use App\Models\User;
+use App\Services\AvatarService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -286,6 +289,49 @@ class AuthController extends Controller
 
         return response()->json([
             'user' => new UserResource($user->load('tenant')),
+        ]);
+    }
+
+    /**
+     * Subida del avatar del usuario autenticado.
+     *
+     * El archivo original nunca se persiste: AvatarService genera un thumbnail
+     * optimizado (WebP) y guarda su URL pública en users.avatar_url, reemplazando
+     * el anterior. Devuelve el user completo para que el front refresque sin
+     * re-peticionar /auth/me.
+     */
+    public function uploadAvatar(AvatarUploadRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        try {
+            $url = app(AvatarService::class)->store($request->file('avatar'), $user);
+        } catch (AvatarProcessingUnavailable $e) {
+            return response()->json([
+                'error' => 'avatar_processing_unavailable',
+                'detail' => $e->getMessage(),
+            ], 501);
+        }
+
+        $user->avatar_url = $url;
+        $user->save();
+
+        return response()->json([
+            'user' => new UserResource($user->load('tenant')),
+        ]);
+    }
+
+    /**
+     * Elimina el avatar del usuario autenticado (DELETE /auth/me/avatar).
+     * Borra el archivo y nullifica users.avatar_url; el front vuelve al fallback.
+     * Devuelve el user completo para que el front refresque sin re-peticionar.
+     */
+    public function removeAvatar(Request $request): JsonResponse
+    {
+        app(AvatarService::class)->remove($request->user());
+
+        return response()->json([
+            'user' => new UserResource($request->user()->load('tenant')),
         ]);
     }
 
