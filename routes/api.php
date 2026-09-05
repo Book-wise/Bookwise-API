@@ -178,6 +178,13 @@ Route::middleware(['auth:sanctum', 'throttle:api_auth'])->prefix('v1')->group(fu
     Route::get('/businesses', [BusinessController::class, 'index']);
     Route::post('/businesses', [BusinessController::class, 'store']);
     Route::patch('/businesses/{id}', [BusinessController::class, 'update']);
+    // Asignar/desasignar admin_local a un negocio (solo admin_general).
+    Route::post('/businesses/{id}/assign-admin-local', [BusinessController::class, 'assignAdminLocal']);
+    Route::delete('/businesses/{id}/assign-admin-local', [BusinessController::class, 'unassignAdminLocal']);
+    // Logo de un negocio concreto (no el del tenant activo) — admin_general o
+    // admin_local del propio negocio.
+    Route::post('/businesses/{id}/logo', [BusinessController::class, 'uploadLogo']);
+    Route::delete('/businesses/{id}/logo', [BusinessController::class, 'removeLogo']);
 
     // Roles catalog — global business-role definitions, admin only, no
     // tenant required (R11.1); the assignment endpoint enforces onboarding

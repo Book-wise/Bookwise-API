@@ -8,6 +8,9 @@ use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class BusinessOnboardingTest extends TestCase
@@ -226,5 +229,88 @@ class BusinessOnboardingTest extends TestCase
         $response->assertJsonValidationErrors(['plan']);
         $this->assertDatabaseCount('tenants', 0);
         $this->assertDatabaseCount('user_role', 0);
+    }
+
+    // ── Multi-tenant: admin_general can create ADDITIONAL businesses ────────
+
+    public function test_admin_general_can_create_additional_business_without_changing_active_tenant(): void
+    {
+        $first = $this->associateTenant($this->admin, ['business_name' => 'Primero']);
+        $adminGeneral = Role::where('slug', 'admin_general')->firstOrFail();
+        $this->admin->roles()->attach($adminGeneral->id, ['tenant_id' => $first->id]);
+
+        $this->authenticateAs($this->admin);
+
+        $response = $this->postJson('/api/v1/businesses', $this->validPayload([
+            'name' => 'Segundo',
+            'rut' => '22222222-2',
+        ]));
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.name', 'Segundo');
+
+        // Active tenant does NOT change (stays on the first business).
+        $this->assertSame($first->id, $this->admin->fresh()->tenant_id);
+
+        // The new tenant exists and the admin_general pivot is attached to it.
+        $second = Tenant::where('business_rut', '22222222-2')->firstOrFail();
+        $this->assertDatabaseHas('user_role', [
+            'user_id' => $this->admin->id,
+            'tenant_id' => $second->id,
+            'role_id' => $adminGeneral->id,
+        ]);
+    }
+
+    public function test_admin_general_can_create_additional_business_with_professional_plan(): void
+    {
+        $first = $this->associateTenant($this->admin, ['business_name' => 'Primero']);
+        $adminGeneral = Role::where('slug', 'admin_general')->firstOrFail();
+        $this->admin->roles()->attach($adminGeneral->id, ['tenant_id' => $first->id]);
+
+        $this->authenticateAs($this->admin);
+
+        $response = $this->postJson('/api/v1/businesses', $this->validPayload([
+            'plan' => 'professional',
+        ]));
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('data.plan', 'professional');
+        $this->assertSame('professional', Tenant::where('business_rut', '11111111-1')->value('business_plan'));
+    }
+
+    public function test_admin_general_can_create_additional_business_with_optional_logo(): void
+    {
+        Storage::fake('public');
+        $first = $this->associateTenant($this->admin, ['business_name' => 'Primero']);
+        $adminGeneral = Role::where('slug', 'admin_general')->firstOrFail();
+        $this->admin->roles()->attach($adminGeneral->id, ['tenant_id' => $first->id]);
+
+        $this->authenticateAs($this->admin);
+
+        $response = $this->postJson('/api/v1/businesses', $this->validPayload([
+            'logo' => UploadedFile::fake()->image('logo.png', 300, 300),
+        ]));
+
+        $response->assertStatus(201);
+        $this->assertNotNull($response->json('data.logo_url'));
+
+        $relative = Str::after($response->json('data.logo_url'), '/storage/');
+        Storage::disk('public')->assertExists($relative);
+    }
+
+    // ── Multi-tenant: non-admin_general blocked once on-boarded (legacy S16) ──
+
+    public function test_non_admin_general_with_business_cannot_create_another(): void
+    {
+        // The default $this->admin has a tenant but NO admin_general business role.
+        $this->associateTenant($this->admin, ['business_name' => 'Ya Existo']);
+
+        $this->authenticateAs($this->admin);
+
+        $response = $this->postJson('/api/v1/businesses', $this->validPayload());
+
+        $response->assertStatus(409);
+        $response->assertJson(['error' => 'business_already_exists']);
+        $this->assertDatabaseCount('tenants', 1);
     }
 }

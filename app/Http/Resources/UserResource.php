@@ -2,9 +2,7 @@
 
 namespace App\Http\Resources;
 
-use App\Enums\UserRole;
 use App\Http\Resources\V1\BusinessResource;
-use App\Models\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -26,23 +24,36 @@ class UserResource extends JsonResource
             'onboarding_complete' => $this->tenant_id !== null,
             'business' => new BusinessResource($this->whenLoaded('tenant')),
             'businesses' => $this->businessesList(),
+            // Roles de NEGOCIO (distintos del rol técnico `role`). El frontend
+            // los usa para gatear acciones de gestión multi-tenant.
+            'is_admin_general' => $this->isAdminGeneral(),
+            'is_admin_local' => $this->isAdminLocal(),
         ];
     }
 
     /**
-     * Negocios a los que el usuario puede alternar (para el selector multi-tenant).
-     * Admin general (rol de negocio) ve todos; admin local / provider / staff,
-     * solo el suyo.
+     * Negocios a los que el usuario puede alternar (selector multi-tenant).
+     *
+     * Son los tenants donde el usuario tiene UN ROL DE NEGOCIO asignado
+     * (pivot user_role), NO todos los tenants del sistema. Así un admin
+     * general ve solo sus negocios, un admin local solo el suyo, y nadie
+     * ve tenants ajenos a sus relaciones.
      */
     private function businessesList(): array
     {
-        if ($this->role !== UserRole::ADMIN || ! $this->isAdminGeneral()) {
-            return $this->tenant_id ? [new BusinessResource($this->tenant)] : [];
-        }
-
-        return Tenant::orderBy('business_name')
+        $businesses = $this->businesses()
+            ->orderBy('business_name')
             ->get()
             ->map(fn ($tenant) => new BusinessResource($tenant))
             ->all();
+
+        // Compatibilidad: si por cualquier motivo el usuario aún no tiene pivots
+        // de rol de negocio pero sí un tenant activo, lo exponemos igual (casos
+        // seed previos al multi-tenant).
+        if ($businesses === [] && $this->tenant_id) {
+            return [new BusinessResource($this->tenant)];
+        }
+
+        return array_values(array_filter($businesses));
     }
 }

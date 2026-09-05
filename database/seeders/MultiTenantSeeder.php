@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\Location;
 use App\Models\Provider;
 use App\Models\Role;
+use App\Models\RoleAssignment;
 use App\Models\Service;
 use App\Models\Tenant;
 use App\Models\User;
@@ -121,16 +122,30 @@ class MultiTenantSeeder extends Seeder
         // ── Reservas de esta semana para los profesionales del tenant 2 ────────
         $this->seedBookings($providerA, $providerB, $loc2, $tenant2);
 
-        // ── Roles de negocio ──────────────────────────────────────────────────
+        // ── Roles de negocio (relaciones multi-tenant actualizadas) ────────────
         $roleGeneral = Role::where('slug', 'admin_general')->first();
         $roleLocal = Role::where('slug', 'admin_local')->first();
 
-        if ($roleGeneral) {
-            $admin = User::where('email', 'admin@kinesilk.cl')->first();
-            if ($admin && ! $admin->hasBusinessRole('admin_general')) {
-                $admin->roles()->attach($roleGeneral->id, ['tenant_id' => 1]);
-                $this->command->info('✓ admin@kinesilk.cl → admin_general');
+        // Admin general: gestiona TODOS los tenants. Le garantizamos el rol de
+        // negocio `admin_general` en cada tenant existente (no hardcodeado a un
+        // id) y un tenant_id activo coherente con el negocio principal.
+        $admin = User::where('email', 'admin@kinesilk.cl')->first();
+        if ($admin && $roleGeneral) {
+            foreach (Tenant::all() as $tenant) {
+                $exists = RoleAssignment::where('user_id', $admin->id)
+                    ->where('tenant_id', $tenant->id)
+                    ->where('role_id', $roleGeneral->id)
+                    ->exists();
+
+                if (! $exists) {
+                    RoleAssignment::create([
+                        'user_id' => $admin->id,
+                        'tenant_id' => $tenant->id,
+                        'role_id' => $roleGeneral->id,
+                    ]);
+                }
             }
+            $this->command->info('✓ admin@kinesilk.cl → admin_general (todos los tenants)');
         }
 
         if ($roleLocal) {
@@ -144,8 +159,18 @@ class MultiTenantSeeder extends Seeder
                 ],
             );
             $local->forceFill(['email_verified_at' => now()])->save();
-            if (! $local->hasBusinessRole('admin_local')) {
-                $local->roles()->attach($roleLocal->id, ['tenant_id' => $tenant2->id]);
+
+            $exists = RoleAssignment::where('user_id', $local->id)
+                ->where('tenant_id', $tenant2->id)
+                ->where('role_id', $roleLocal->id)
+                ->exists();
+
+            if (! $exists) {
+                RoleAssignment::create([
+                    'user_id' => $local->id,
+                    'tenant_id' => $tenant2->id,
+                    'role_id' => $roleLocal->id,
+                ]);
             }
             $this->command->info("✓ local.cordillera@kinesilk.cl → admin_local (tenant {$tenant2->id})");
         }

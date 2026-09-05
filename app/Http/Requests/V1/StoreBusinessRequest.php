@@ -16,7 +16,10 @@ class StoreBusinessRequest extends FormRequest
             'email' => ['required', 'email', 'max:255'],
             'address' => ['required', 'string', 'max:255'],
             'phone' => ['required', 'string', 'max:50'],
-            'plan' => ['sometimes', Rule::in(['starter'])],
+            'plan' => ['sometimes', Rule::in(['starter', 'professional', 'enterprise'])],
+            // Logo OPCIONAL del negocio (aparece en recibos/email). Se procesa
+            // fuera de la transacción: si falla, el negocio se crea igual.
+            'logo' => ['nullable', 'image', 'mimes:jpeg,png,webp', 'max:2048'],
         ];
     }
 
@@ -39,6 +42,9 @@ class StoreBusinessRequest extends FormRequest
             'phone.string' => 'El teléfono del negocio debe ser un texto válido.',
             'phone.max' => 'El teléfono del negocio no puede superar los 50 caracteres.',
             'plan.in' => 'El plan seleccionado no es válido.',
+            'logo.image' => 'El logo debe ser una imagen.',
+            'logo.mimes' => 'El logo debe ser JPG, PNG o WebP.',
+            'logo.max' => 'El logo no puede superar los 2 MB.',
         ];
     }
 }

@@ -50,6 +50,18 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
+    /**
+     * Negocios (tenants) donde este usuario tiene un rol de negocio asignado,
+     * vía el pivot user_role. Estos son los que el usuario puede alternar/gestionar;
+     * NO son todos los tenants del sistema.
+     */
+    public function businesses(): BelongsToMany
+    {
+        return $this->belongsToMany(Tenant::class, 'user_role', 'user_id', 'tenant_id')
+            ->withPivot('role_id')
+            ->withTimestamps();
+    }
+
     public function isAdmin(): bool
     {
         return $this->role === UserRole::ADMIN;
@@ -81,5 +93,17 @@ class User extends Authenticatable
     public function isAdminLocal(): bool
     {
         return $this->hasBusinessRole('admin_local');
+    }
+
+    /**
+     * ¿Puede gestionar (editar) un negocio concreto?
+     *
+     * Admin general gestiona TODOS los tenants; admin local solo el suyo
+     * (si el tenant coincide con su tenant_id activo). Providers/otros nunca.
+     */
+    public function canManageTenant(int $tenantId): bool
+    {
+        return $this->isAdminGeneral()
+            || ($this->isAdminLocal() && $this->tenant_id === $tenantId);
     }
 }
