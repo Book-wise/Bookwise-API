@@ -12,6 +12,7 @@
 /.phpunit.cache
 /.vscode
 /.zed
+/.codegraph
 /auth.json
 /node_modules
 /public/build
@@ -19,6 +20,9 @@
 /public/storage
 /storage/*.key
 /storage/pail
+/cacert.pem
+/.claude/worktrees
+/.claude/settings.local.json
 /vendor
 _ide_helper.php
 Homestead.json

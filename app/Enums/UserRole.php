@@ -4,10 +4,11 @@ namespace App\Enums;
 
 enum UserRole: string
 {
-    case ADMIN       = 'admin';
-    case PROVIDER    = 'provider';
-    case CLIENT      = 'client';
+    case ADMIN = 'admin';
+    case PROVIDER = 'provider';
+    case CLIENT = 'client';
     case WOOCOMMERCE = 'woocommerce';
+    case AGENT = 'agent';
 
     /**
      * Sanctum token abilities assigned on login for each role.
@@ -17,10 +18,11 @@ enum UserRole: string
     public function tokenAbilities(): array
     {
         return match ($this) {
-            self::ADMIN       => ['*'],
-            self::PROVIDER    => ['bookings:read', 'bookings:write', 'clients:read'],
+            self::ADMIN => ['*'],
+            self::PROVIDER => ['bookings:read', 'bookings:write', 'clients:read', 'providers:read'],
             self::WOOCOMMERCE => ['clients:read', 'clients:write', 'bookings:read', 'bookings:write'],
-            self::CLIENT      => ['clients:read'],
+            self::CLIENT => ['clients:read'],
+            self::AGENT => ['bookings:read', 'bookings:write', 'clients:read', 'clients:write', 'providers:read'],
         };
     }
 }

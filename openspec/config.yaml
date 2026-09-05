@@ -1,0 +1,45 @@
+schema: spec-driven
+
+context: |
+  Project: Bookwise-API (appointment/booking REST API with WooCommerce integration)
+  Stack: PHP 8.3, Laravel 13, Sanctum 4, spatie/laravel-query-builder
+  Architecture: Versioned REST API (Api/V1), Eloquent API Resources, Services layer
+  Testing: PHPUnit 12 (Unit + Feature), SQLite :memory:
+  Style: Laravel Pint (default preset)
+
+strict_tdd: true
+
+testing:
+  runner: "php artisan test --compact"
+  framework: PHPUnit 12
+  unit: tests/Unit
+  feature: tests/Feature
+  coverage: false
+  linter: "vendor/bin/pint"
+  type_checker: none
+  formatter: "vendor/bin/pint"
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    guidelines:
+      - Follow existing code patterns
+      - Follow Laravel conventions; use php artisan make: commands
+    tdd: true
+    test_command: "php artisan test --compact"
+  verify:
+    test_command: "php artisan test --compact"
+    build_command: ""
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas

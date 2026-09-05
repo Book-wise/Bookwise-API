@@ -18,6 +18,13 @@ return [
         'key' => env('POSTMARK_API_KEY'),
     ],
 
+    'mailgun' => [
+        'domain' => env('MAILGUN_DOMAIN'),
+        'secret' => env('MAILGUN_SECRET'),
+        'endpoint' => env('MAILGUN_ENDPOINT', 'api.mailgun.net'),
+        'scheme' => 'https',
+    ],
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],
@@ -36,10 +43,21 @@ return [
     ],
 
     'woocommerce' => [
-        'consumer_key'    => env('WC_CONSUMER_KEY'),
+        'consumer_key' => env('WC_CONSUMER_KEY'),
         'consumer_secret' => env('WC_CONSUMER_SECRET'),
-        'webhook_secret'  => env('WC_WEBHOOK_SECRET'),
-        'store_url'       => env('WC_STORE_URL'),
+        'webhook_secret' => env('WC_WEBHOOK_SECRET'),
+        'store_url' => env('WC_STORE_URL'),
+    ],
+
+    'carlitox' => [
+        'webhook_url' => env('CARLITOX_WEBHOOK_URL'),
+    ],
+
+    'frontend' => [
+        // Base URL of the frontend, used to build email-verification links
+        // (FRONTEND_URL/verify-email?token=...) delivered via carlitox.
+        // Blank value makes the verification job fail loudly (R2.4/D1).
+        'url' => env('FRONTEND_URL'),
     ],
 
 ];

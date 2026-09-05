@@ -11,12 +11,12 @@ class ClientPack extends Model
 
     protected $fillable = [
         'client_id', 'service_pack_id', 'wc_order_id',
-        'total_sessions', 'used_sessions', 'status'
+        'total_sessions', 'used_sessions', 'status',
     ];
 
     protected $casts = [
         'total_sessions' => 'integer',
-        'used_sessions'  => 'integer',
+        'used_sessions' => 'integer',
     ];
 
     public function client()

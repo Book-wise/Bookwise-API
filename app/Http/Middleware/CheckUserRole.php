@@ -17,11 +17,11 @@ class CheckUserRole
             return response()->json(['error' => 'unauthenticated', 'detail' => 'Authentication required.'], 401);
         }
 
-        $allowed = array_map(fn(string $r) => UserRole::from($r), $roles);
+        $allowed = array_map(fn (string $r) => UserRole::from($r), $roles);
 
         if (! in_array($user->role, $allowed)) {
             return response()->json([
-                'error'  => 'forbidden',
+                'error' => 'forbidden',
                 'detail' => 'Access denied for your role.',
             ], 403);
         }

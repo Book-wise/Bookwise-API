@@ -10,12 +10,12 @@ class ServicePack extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'service_id', 'name', 'total_sessions', 'price', 'active'
+        'service_id', 'name', 'total_sessions', 'price', 'active',
     ];
 
     protected $casts = [
-        'active'         => 'boolean',
-        'price'          => 'decimal:2',
+        'active' => 'boolean',
+        'price' => 'decimal:2',
         'total_sessions' => 'integer',
     ];
 
